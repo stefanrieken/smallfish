@@ -1,5 +1,5 @@
 Dictionary * make_dict(WORD type, WORD parent, int num_entries);
-DictEntry * define(Object * dict, Object * name, WORD value, bool is_ptr);
+DictEntry * define(Object * dict, Object * name, WORD value);
 
 Object * make_class(Object * ctx, char * name, WORD type, WORD parent);
 

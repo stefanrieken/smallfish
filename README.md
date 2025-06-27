@@ -43,12 +43,14 @@ for SmallFish:
 ## Status
 SmallFish can now parse simple nested expressions on the REPL:
 
-        help     -> shows a help text
-        env ls   -> lists the root context
-        Int ls   -> shows methods on integers
-        7*(2+4)  -> shows the meaning of life
+        help            -> shows a help text
+        env ls          -> lists the root context
+        Int ls          -> shows methods on integers
+        env define x 7  -> define env value 'x'
+        x * (2+4)       -> shows the meaning of life
 
-        gc apply -> does a garbage collection round
+        gc apply        -> does a garbage collection round
+        [1 2 3]         -> constructs a value array
 
 ## Specific TODOs
 - Finalize type hierarchy in dictionaries

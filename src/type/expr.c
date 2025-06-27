@@ -22,7 +22,7 @@ bool is_bracket(int ch) {
 bool is_binary_expr(int ch) {
     return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%'
         || ch == '<' || ch == '>' || ch == '&' || ch == '|' || ch == '^'
-        || ch == '!';
+        || ch == '!' || ch == '~';
 }
 
 int read_non_whitespace_char(char until) {
@@ -63,6 +63,10 @@ Object * parse_expr(char until) {
         } else if (ch == '(') {
             expr[idx++] = tag_obj(parse_expr(')'));
             ch = read_non_whitespace_char(until);
+        } else if (ch == '[') {
+            expr[idx++] = tag_obj(parse_expr(']'));
+            as_obj(expr[idx-1])->type=CT_PARR;
+            ch = read_non_whitespace_char(until);
         } else if (is_binary_expr(ch)) {
             // binary expression. TODO merge with label below, only continuation criteria differ
             char buffer[256]; int i=0;
@@ -99,13 +103,19 @@ void gc_mark_obj_array(Object * obj_array) {
 
 extern void print_val(WORD val);
 
-void print_expr(WORD val) {
+void print_list(WORD val) {
     Object * expr = as_obj(val);
-    printf("( ");
     for(int i=0; i<expr->size/sizeof(WORD);i++) {
         print_val(expr->value.ws[i]);printf(" ");
     }
-    printf(")");
+}
+
+void print_parr(WORD val) {
+    printf("[ "); print_list(val); printf("]");
+}
+
+void print_expr(WORD val) {
+    printf("( "); print_list(val); printf(")");
 }
 
 #define OBJ_POS 0
@@ -139,7 +149,7 @@ CoreType * parr_core_type(Object * ctx) {
     CoreType * result = allocate(CoreType, 1);
     result->type = type;
     result->eval = eval_to_self;
-    result->print = print_expr;
+    result->print = print_parr;
     result->mark = gc_mark_obj_array;
     return result;
 };

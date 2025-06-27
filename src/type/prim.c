@@ -34,7 +34,7 @@ WORD apply_cb(Object * ctx, WORD prim, WORD obj, WORD arg1, WORD arg2, WORD arg3
 
 CoreType * prim_core_type(Object * ctx) {
     Object * type = make_class(ctx, "Primitive", nil, nil);
-    define(type, string_literal("apply"), make_prim( apply_cb), true);
+    define(type, string_literal("apply"), make_prim(apply_cb));
 
     CoreType * result = allocate(CoreType, 1);
     result->type = type;

@@ -91,7 +91,7 @@ int main (int argc, char ** argv) {
     CT_DICT = 6;
 
     Object * root = add_object(&objects, make_dict(nil, nil, 1), CT_DICT, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
-    define(root, string_literal("env"), tag_obj(root), true);
+    define(root, string_literal("env"), tag_obj(root));
 
     num_core_types = 8;
     core_types = allocate(CoreType, num_core_types);
@@ -107,8 +107,8 @@ int main (int argc, char ** argv) {
     if (idx != CT_DICT) { printf("ERROR: the presumed bootstrap value for CT_DICT has changed (expected %d got %d)!\n", CT_DICT, idx); exit(-1); }
     CT_DICT      = add_core_type(idx++,   dict_core_type(root));
 
-    define(root, string_literal("gc"), make_prim(gc_cb), true);
-    define(root, string_literal("help"), tag_obj(string_literal("Type 'env ls' to list global defintions. Type e.g. 'Int ls' to find integer methods.")), true);
+    define(root, string_literal("gc"), make_prim(gc_cb));
+    define(root, string_literal("help"), tag_obj(string_literal("Type 'env ls' to list global defintions. Type e.g. 'Int ls' to find integer methods.")));
 
     PERMGEN = objects[0].value.count;
 

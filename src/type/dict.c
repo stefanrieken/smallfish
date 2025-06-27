@@ -19,22 +19,30 @@ Dictionary * make_dict(WORD type, WORD parent, int num_entries) {
     return dict;
 }
 
-DictEntry * define(Object * dict, Object * name, WORD value, bool is_ptr) {
+DictEntry * define1(Object * dict, WORD name, WORD value) {
     dict->value.dict = reallocate(dict->value.dict, uint8_t, dict->size+sizeof(DictEntry));
     DictEntry * entry = &(dict->value.dict[dict->size / sizeof(DictEntry)]);
     dict->size += sizeof(DictEntry);
 
-    //printf("Defining entry %s %ld #%ld %p in dict (object #%ld, value %p)\n", name->value.str, idx(name), entry-(dict->value.dict), entry, idx(dict), dict->value.dict);
-    
-    entry->name=tag_obj(name); // to obtain index as WORD
+    entry->name=name;
     entry->value=value;
 
     return entry;
 }
 
+DictEntry * define(Object * dict, Object * name, WORD value) {
+    return define1(dict,tag_obj(name),value);
+}
+
+WORD define_cb(Object * ctx, WORD dict, WORD name, WORD val) {
+    // Don't eval name, just demand it to be label
+    return define1(as_obj(dict), name, eval(val, ctx))->value;
+}
+
+
 Object * make_class(Object * ctx, char * name, WORD type, WORD parent) {
     Object * obj = add_object(&objects, make_dict(type, parent, 1), CT_DICT, sizeof(DictEntry) * 1);
-    define(ctx, string_literal(name), tag_obj(obj), true);
+    define(ctx, string_literal(name),tag_obj(obj));
     return obj;
 }
 
@@ -79,7 +87,8 @@ void gc_mark_dict(Object * dict) {
 
 CoreType * dict_core_type(Object * ctx) {
     Object * type = make_class(ctx, "Dict", nil, nil);
-    define(type, string_literal("ls"), make_prim( ls), true);
+    define(type, string_literal("define"), make_prim(define_cb));
+    define(type, string_literal("ls"), make_prim( ls));
 
     CoreType * result = allocate(CoreType, 1);
     result->type = type;
