@@ -2,13 +2,16 @@
 #include <string.h>
 
 #include "../smallfish.h"
+#include "../parse.h"
 #include "../gc.h"
+
 #include "dict.h"
+#include "prim.h"
 
 int CT_STRING_RO;
 int CT_STRING;
 
-extern Object * add_object1(ObjectTable ** table, void * value, int type, int size, int search_from);
+extern Object * add_object1(ObjectTable ** table, void * value, int type, Object * type1, int size, int search_from);
 
 char * copy(char * str) {
     char * copy = allocate(char,strlen(str)+1);
@@ -17,7 +20,7 @@ char * copy(char * str) {
 }
 
 Object * make_string(char * value) {
-    return add_object(&objects, copy(value), CT_STRING, strlen(value)+1);
+    return add_object(&objects, copy(value), CT_STRING, core_types[CT_STRING]->type, strlen(value)+1);
 }
 
 Object * string_literal(char * value) {
@@ -32,7 +35,7 @@ Object * string_literal(char * value) {
     }
     // Not found; add
     //printf("First free: %d\n", first_free);
-    return add_object1(&objects, value, CT_STRING_RO, strlen(value)+1, first_free == 0 ? 1 : first_free);
+    return add_object1(&objects, value, CT_STRING_RO, core_types[CT_STRING_RO]->type, strlen(value)+1, first_free == 0 ? 1 : first_free);
 }
 
 void print_string(WORD val) {
@@ -45,26 +48,55 @@ WORD resolve_label(WORD val, Object * ctx) {
     return entry->value;
 }
 
-CoreType * label_core_type(Object * ctx) {
-    Object * type = make_class(ctx, "Label", nil, nil);
+WORD resolve_label_cb(Object * ctx, WORD val) {
+    return resolve_label(val, ctx);
+}
 
-    CoreType * result = allocate(CoreType, 1);
-    result->type = type;
-    result->eval = resolve_label;
-    result->print = print_string;
-    result->mark = gc_mark_none; // retain system strings
-    return result;
+bool parse_label(int * ch, WORD * result) {
+    // Ideally label should be considered after exhausting other things
+    // For now, do some sanity checking
+    // Don't have to test for int, which comes before this
+    if (is_bracket(*ch) || *ch == '\"') return false; // It's something else
+
+    char buffer[256]; int i=0;
+    if (is_binary_expr(*ch)) {
+        // binary expression. TODO merge with label below, only continuation criteria differ
+        while (is_binary_expr(*ch)) {
+            buffer[i++] = *ch;
+            *ch=getchar();
+        }
+    } else {
+        while (*ch != EOF && *ch != ';' && !is_whitespace_char(*ch) && !is_bracket(*ch)) {
+            buffer[i++] = *ch;
+            *ch=getchar();
+        }
+    }
+
+
+    buffer[i++] = '\0';
+    //printf("*%s*\n", buffer);
+    *result = tag_obj(string_literal(buffer));
+    return true;
+}
+
+void label_core_type(CoreType * ct, Object * ctx) {
+    define(ctx, string_literal("Label"), tag_obj(ct->type));
+    define(ct->type, string_literal("eval"), make_prim(resolve_label_cb));
+
+    ct->eval = resolve_label;
+    ct->apply = NULL;
+    ct->parse = parse_label;
+    ct->print = print_string;
+    ct->mark = gc_mark_none; // retain system strings
 };
 
-CoreType * string_core_type(Object * ctx) {
-    Object * type = make_class(ctx, "String", nil, nil);
+void string_core_type(CoreType * ct, Object * ctx) {
+    define(ctx, string_literal("String"), tag_obj(ct->type));
 
-    CoreType * result = allocate(CoreType, 1);
-    result->type = type;
-    result->eval = eval_to_self;
-    result->apply = NULL; // for now at least; maybe apply string == map key?
-    result->print = print_string;
-    result->mark = gc_mark_none; // TODO write correct gc function (should be simple)
-    return result;
+    ct->eval = eval_to_self;
+    ct->apply = NULL; // for now at least; maybe apply string == map key?
+    ct->parse = parse_label;
+    ct->print = print_string;
+    ct->mark = gc_mark_none; // TODO write correct gc function (should be simple)
 };
 

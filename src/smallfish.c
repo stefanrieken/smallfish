@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "smallfish.h"
+#include "parse.h"
 #include "gc.h"
 
 #include "type/int.h"
@@ -13,9 +14,10 @@
 ObjectTable * objects;
 
 WORD eval_to_self(WORD val, Object * ctx) { return val; }
+WORD apply_to_self(WORD msg, WORD obj, Object * args, Object * ctx) { return msg; }
 
 // search_from is a hint for a potential vacant slot
-Object * add_object1(ObjectTable ** table, void * value, int type, int size, int search_from) {
+Object * add_object1(ObjectTable ** table, void * value, int type, Object * type1, int size, int search_from) {
     Object * result = NULL;
  
     for (int i=search_from; i<(*table)->value.count;i++) {
@@ -34,6 +36,7 @@ Object * add_object1(ObjectTable ** table, void * value, int type, int size, int
     }
 
     result->type = type;
+    result->type1 = tag_obj(type1);
     result->value.ptr = value;
     result->size = size;
     result->refcount = 0;
@@ -42,15 +45,23 @@ Object * add_object1(ObjectTable ** table, void * value, int type, int size, int
     return result;
 }
 
-Object * add_object(ObjectTable ** table, void * value, int type, int size) {
-    return add_object1(table, value, type, size, 1);
+Object * add_object(ObjectTable ** table, void * value, int type, Object * type1, int size) {
+    return add_object1(table, value, type, type1, size, 1);
 }
+
+WORD STR_EVAL;
 
 WORD eval(WORD val, Object * ctx) {
     if (is_int(val)) return val;
     // else
     Object * obj = as_obj(val);
-    return core_types[obj->type]->eval(val, ctx);
+    DictEntry * entry = lookup(as_obj(obj->type1), STR_EVAL);
+    if (entry == NULL) return val;
+    if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(entry->value, val, NULL, ctx);
+    if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_METH]->type)) return apply_method(entry->value, val, NULL, ctx);
+    return entry->value; // Umm, let's say eval func is actually int 42; return that?
+
+//    return core_types[obj->type]->eval(val, ctx);
 }
 
 void print_val(WORD val) {
@@ -68,12 +79,6 @@ void print_val(WORD val) {
 int num_core_types;
 CoreType ** core_types;
 
-static inline
-int add_core_type(int idx, CoreType * type) {
-    core_types[idx] = type;
-    return idx;
-}
-
 int main (int argc, char ** argv) {
     objects = allocate(Object, 1024);
     objects[0].size=1024; // ONLY for this entry, count size in num entries
@@ -88,40 +93,60 @@ int main (int argc, char ** argv) {
     // as the list is in order of GC complexity)
     CT_PRIM = 1;
     CT_STRING_RO = 2;
-    CT_DICT = 6;
+    CT_DICT = 4;
 
-    Object * root = add_object(&objects, make_dict(nil, nil, 1), CT_DICT, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
-    define(root, string_literal("env"), tag_obj(root));
+    Object * root = add_object(&objects, make_dict(nil, 1), CT_DICT, NULL, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
 
     num_core_types = 8;
-    core_types = allocate(CoreType, num_core_types);
-    int idx = 0;
-    CT_INT       = add_core_type(idx++,    int_core_type(root));
-    if (idx != CT_PRIM) { printf("ERROR: the presumed bootstrap value for CT_PRIM has changed (expected %d got %d)!\n", CT_PRIM, idx); exit(-1); }
-    CT_PRIM      = add_core_type(idx++,   prim_core_type(root));
-    if (idx != CT_STRING_RO) { printf("ERROR: the presumed bootstrap value for CT_STRING_RO has changed (expected %d got %d)!\n", CT_STRING_RO, idx); exit(-1); }
-    CT_STRING_RO = add_core_type(idx++,  label_core_type(root));
-    CT_STRING    = add_core_type(idx++, string_core_type(root));
-    CT_PARR      = add_core_type(idx++,   parr_core_type(root));
-    CT_EXPR      = add_core_type(idx++,   expr_core_type(root));
-    if (idx != CT_DICT) { printf("ERROR: the presumed bootstrap value for CT_DICT has changed (expected %d got %d)!\n", CT_DICT, idx); exit(-1); }
-    CT_DICT      = add_core_type(idx++,   dict_core_type(root));
+    core_types = allocate(CoreType *, num_core_types);
 
+    // Initialize stub core type class objects
+    for (int i=0;i<num_core_types;i++) {
+        core_types[i] = allocate(CoreType, 1);
+        core_types[i]->type = add_object(&objects, make_dict(nil, 1), CT_DICT, NULL, sizeof(DictEntry) * 1);
+    }
+
+    int idx = 0;
+
+    CT_INT  = idx; int_core_type(core_types[idx++], root);
+
+    if (idx != CT_PRIM) { printf("ERROR: the presumed bootstrap value for CT_PRIM has changed (expected %d got %d)!\n", CT_PRIM, idx); exit(-1); }
+    CT_PRIM = idx; prim_core_type(core_types[idx++], root);
+
+    if (idx != CT_STRING_RO) { printf("ERROR: the presumed bootstrap value for CT_STRING_RO has changed (expected %d got %d)!\n", CT_STRING_RO, idx); exit(-1); }
+    CT_STRING_RO = idx; label_core_type(core_types[idx++], root);
+    CT_STRING    = idx; string_core_type(core_types[idx++], root);
+
+    if (idx != CT_DICT) { printf("ERROR: the presumed bootstrap value for CT_DICT has changed (expected %d got %d)!\n", CT_DICT, idx); exit(-1); }
+    CT_DICT      = idx; dict_core_type(core_types[idx++], root);
+
+    CT_PARR      = idx; parr_core_type(core_types[idx++], root);
+    CT_EXPR      = idx; expr_core_type(core_types[idx++], root);
+    CT_METH      = idx; meth_core_type(core_types[idx++], root);
+
+    if (idx > num_core_types) { printf("ERROR: core_types out of bounds!\n"); exit(-1); }
+
+    // Back-fix dict type for all classes
+    root->type1 = tag_obj(core_types[CT_DICT]->type);
+    for(int i=0;i<num_core_types;i++) core_types[i]->type->type1 = tag_obj(core_types[CT_DICT]->type);
+
+    define(root, string_literal("env"), tag_obj(root));
     define(root, string_literal("gc"), make_prim(gc_cb));
     define(root, string_literal("help"), tag_obj(string_literal("Type 'env ls' to list global defintions. Type e.g. 'Int ls' to find integer methods.")));
 
+    STR_EVAL = tag_obj(string_literal("eval"));
+
     PERMGEN = objects[0].value.count;
-
-    printf("Sizeof dictionary: %ld, dictheader: %ld dictentry: %ld\n", sizeof(Dictionary), sizeof(DictHeader), sizeof(DictEntry));
-
     printf("READY.\n> ");
-    Object * expr = parse_expr('\n');
-    while (expr != NULL) {
-        WORD result = core_types[expr->type]->eval(tag_obj(expr), root);
+    int ch = read_non_whitespace_char('\n');
+    WORD result = parse_expr(&ch, '\n');
+    while(result != nil) { // TODO adjust parse_expr to return proper end value
+        result = eval(result, root);
         printf("["); print_val(result); printf("] Ok.\n> ");
-        expr = parse_expr('\n');
+        ch = read_non_whitespace_char('\n');
+        result = parse_expr(&ch, '\n');
     }
-    
+
     printf("\n");
 }
 

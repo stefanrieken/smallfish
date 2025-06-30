@@ -62,13 +62,6 @@
 // integer values.
 
 
-// The dictionary
-typedef struct DictHeader {
-    WORD parent; //: 31;
-//    bool is_functional_parent : 1;
-    WORD type; // Dictionaries MAY be object instances; then they need a type! (And so do classes)
-} DictHeader;
-
 typedef struct DictEntry {
     WORD name;// : 31;
 //    bool is_ptr : 1;
@@ -96,8 +89,8 @@ typedef struct ObjectTableEntry {
 
     HALFPTR size;
     QUARTPTR refcount; // or GC mark, or whatever
-    QUARTPTR type; // struct CoreType
-
+    QUARTPTR type; // struct CoreType; TODO replace with:
+    HALFPTR type1; // object class
 
 } ObjectTable, Object;
 
@@ -106,7 +99,8 @@ typedef struct ObjectTableEntry {
 //
 
 WORD eval_to_self(WORD val, Object * ctx);
-
+// E.g. for class values to return themselves when called as method
+WORD apply_to_self(WORD msg, WORD obj, Object * args, Object * ctx);
 //
 // List the built-in, physical storage types.
 // These have a one-to-one / many-to-one map to system defined classes;
@@ -135,9 +129,9 @@ typedef struct CoreType {
     Object * type;
     WORD (*eval)(WORD val, Object * ctx);
     WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx);
+    bool (*parse)(int * ch, WORD * result);
     void (*print)(WORD val); // 'type' should define the same, or a more specific, print function
     void (*mark)(Object * obj); // aka gc_mark
-    // TODO parse(!)
 } CoreType;
 
 extern int num_core_types;
@@ -151,5 +145,4 @@ void print_val(WORD val);
 // because I want to keep the indices into this table simple.
 extern ObjectTable * objects;
 
-Object * add_object(ObjectTable ** table, void * value, int type, int size);
-
+Object * add_object(ObjectTable ** table, void * value, int type, Object * type1, int size);

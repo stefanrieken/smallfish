@@ -1,98 +1,56 @@
 #include <stdio.h>
 
 #include "../smallfish.h"
+#include "../parse.h"
 #include "../gc.h"
 
 #include "dict.h"
+#include "prim.h"
 #include "string.h"
 #include "int.h"
 
 int CT_PARR;
 int CT_EXPR;
+int CT_METH;
 
-static inline
-bool is_whitespace_char(int ch) {
-    return ch == ' ' || ch == '\r' || ch == '\n'|| ch == '\t';
-}
+// the CoreType struct based version
 
-bool is_bracket(int ch) {
-    return ch == '(' || ch == ')' || ch == '{'|| ch == '}' || ch == '['|| ch == ']';
-}
-
-bool is_binary_expr(int ch) {
-    return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%'
-        || ch == '<' || ch == '>' || ch == '&' || ch == '|' || ch == '^'
-        || ch == '!' || ch == '~';
-}
-
-int read_non_whitespace_char(char until) {
-    int ch = getchar();
-    if (ch == EOF || ch == until) return ch;
-    while(is_whitespace_char(ch)) ch = getchar();
-    return ch;
-}
-
-bool parse_int(int * ch, int * value) {
-    bool success = false;
-    *value = 0;
-    while (*ch >= '0' && *ch <= '9') {
-        success = true;
-        *value = *value * 10 + (*ch - '0');
-        *ch = getchar();
-    }
-    return success;
-}
-
-// Let's start simple
-Object * parse_expr(char until) {
-//    WORD msg = nil;
-    int value = 0;
-
-    int size = 1; //3; // expect ternary TODO use alloc_aligned
+// toplevel (to call by REPL, block, etc.)
+// NOTE: if expr size == 1, just return value
+WORD parse_expr(int * ch, char until) {
+    int size = 0; // Not presently feasible to pre-alloc larger than used
     int idx = 0; // have none yet
-    WORD * expr = allocate(WORD, size);
+    WORD * expr = NULL; 
 
-    int ch = read_non_whitespace_char(until);
-    while (ch != EOF && ch != until) {
+    while (*ch != EOF && *ch != until) {
         if (idx == size) expr = reallocate(expr, WORD, ++size);
-        if(parse_int(&ch, &value)) {
-            // int
-//            printf("Parsed value %d\n", value);
-            expr[idx++] = tag_int(value);
-            if (ch != EOF && ch != until && is_whitespace_char(ch)) ch = read_non_whitespace_char(until);
-        } else if (ch == '(') {
-            expr[idx++] = tag_obj(parse_expr(')'));
-            ch = read_non_whitespace_char(until);
-        } else if (ch == '[') {
-            expr[idx++] = tag_obj(parse_expr(']'));
-            as_obj(expr[idx-1])->type=CT_PARR;
-            ch = read_non_whitespace_char(until);
-        } else if (is_binary_expr(ch)) {
-            // binary expression. TODO merge with label below, only continuation criteria differ
-            char buffer[256]; int i=0;
-            while (is_binary_expr(ch)) {
-                buffer[i++] = ch;
-                ch=getchar();
-            }
-            buffer[i++] = '\0';
-            expr[idx++] = tag_obj(string_literal(buffer));
-            if (ch != EOF && ch != until && is_whitespace_char(ch)) ch = read_non_whitespace_char(until);            
-        } else {
-            // label
-            char buffer[256]; int i=0;
-            while (ch != EOF && ch != until && !is_whitespace_char(ch) && !is_bracket(ch)) {
-                buffer[i++] = ch;
-                ch=getchar();
-            }
-            buffer[i++] = '\0';
-            //printf("*%s*\n", buffer);
-            expr[idx++] = tag_obj(string_literal(buffer));
-            if (ch != EOF && ch != until && is_whitespace_char(ch)) ch = read_non_whitespace_char(until);
-        }
+        expr[idx++] = parse_object(ch);
+        if (*ch != EOF && *ch != until && is_whitespace_char(*ch)) *ch = read_non_whitespace_char(until);
     }
+    if (idx == 0) { return nil; } // no result
+    if (idx == 1) { WORD result = expr[0]; free(expr); return result; }
 
-    if (idx == 0) return NULL;
-    return add_object(&objects, expr, CT_EXPR, size*sizeof(WORD));
+    return tag_obj(add_object(&objects, expr, CT_EXPR, core_types[CT_EXPR]->type, sizeof(WORD) * size));
+}
+
+// Provide this function in the CoreType struct, as
+// subexpressions are what may appear at any object position.
+bool parse_subexpr(int * ch, WORD * result) {
+    if (*ch != '(') return false;
+    *ch = read_non_whitespace_char(')');
+    *result = parse_expr(ch, ')');
+    *ch = getchar();
+    return true;
+}
+
+bool parse_array(int * ch, WORD * result) {
+    if (*ch != '[') return false;
+    *ch = read_non_whitespace_char(']');
+    *result = parse_expr(ch, ']');
+    *ch = getchar();
+
+    as_obj(*result)->type = CT_PARR;
+    return true;
 }
 
 void gc_mark_obj_array(Object * obj_array) {
@@ -143,26 +101,70 @@ WORD eval_expr(WORD val, Object * ctx) {
 
 }
 
-CoreType * parr_core_type(Object * ctx) {
-    Object * type = make_class(ctx, "Array", nil, nil);
+WORD eval_expr_cb(Object * ctx, WORD expr) {
+    return eval_expr(expr, ctx);
+}
 
-    CoreType * result = allocate(CoreType, 1);
-    result->type = type;
-    result->eval = eval_to_self;
-    result->print = print_parr;
-    result->mark = gc_mark_obj_array;
-    return result;
+void parr_core_type(CoreType * ct, Object * ctx) {
+    define(ctx, string_literal("Array"), tag_obj(ct->type));
+
+    ct->eval = eval_to_self;
+    ct->parse = parse_array;
+    ct->print = print_parr;
+    ct->mark = gc_mark_obj_array;
 };
 
-CoreType * expr_core_type(Object * ctx) {
-    // TODO ad parray as parent
-    Object * type = make_class(ctx, "Expression", nil, nil);
+void expr_core_type(CoreType * ct, Object * ctx) {
+    define(ctx, string_literal("Expression"), tag_obj(ct->type));
+    ct->type->value.dict[0].value = tag_obj(core_types[CT_PARR]->type);
 
-    CoreType * result = allocate(CoreType, 1);
-    result->type = type;
-    result->eval = eval_expr;
-    result->apply = NULL; // for now; but TODO expr == native code?
-    result->print = print_expr;
-    result->mark = gc_mark_obj_array;
-    return result;
+    define(ct->type, string_literal("eval"), make_prim(eval_expr_cb));
+
+    ct->eval = eval_expr;
+    ct->apply = NULL; // for now; but TODO expr == native code?
+    ct->parse = parse_subexpr;
+    ct->print = print_expr;
+    ct->mark = gc_mark_obj_array;
 };
+
+WORD make_method(WORD args, WORD body) {
+    WORD * method = allocate(WORD, 2);
+    method[0] = args;
+    method[1] = body;
+    return tag_obj(add_object(&objects, method, CT_METH, core_types[CT_METH]->type, sizeof(WORD) * 2));
+}
+
+WORD apply_method(WORD msg, WORD obj, Object * expr, Object * caller_ctx) {
+    Object * meth = as_obj(msg);
+    Object * args = as_obj(meth->value.ws[0]);
+    WORD body = meth->value.ws[1];
+printf("Args size: %d\n", args->size);
+    Object * ctx = add_object(&objects, allocate(uint8_t, args->size*2), CT_DICT, core_types[CT_DICT]->type, args->size*2);
+    // TODO finally properly work out dict parent, type,
+    // otherwise we also cannot access instance variables
+    ctx->value.dict[0].name = nil;
+    ctx->value.dict[0].value = nil;
+    ctx->value.dict[1].name = args->value.ws[0];
+    ctx->value.dict[1].value = expr->value.ws[OBJ_POS];
+
+    for (int i=1; i<args->size/sizeof(WORD); i++) {
+        ctx->value.dict[i+1].name = args->value.ws[i];
+        ctx->value.dict[i+1].value = eval(expr->value.ws[i+1], caller_ctx);
+    }
+
+    return eval(body, ctx);
+}
+
+void print_method(WORD val) {
+    printf("(a method)");
+}
+
+void meth_core_type(CoreType * ct, Object * ctx) {
+    define(ctx, string_literal("Method"), tag_obj(ct->type));
+    ct->type->value.dict[0].value = tag_obj(core_types[CT_PARR]->type);
+
+    ct->eval = eval_to_self;
+    ct->apply = apply_method;
+    ct->print = print_method;
+    ct->mark = gc_mark_obj_array;
+}

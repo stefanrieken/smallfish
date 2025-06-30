@@ -1,10 +1,16 @@
-Object * parse_expr(char until);
+WORD parse_expr(int * ch, char until);
+
 void print_expr(WORD val);
 int gc_mark_obj_array(Object * obj_array);
 WORD eval_expr(WORD val, Object * ctx);
 
 extern int CT_PARR;
-extern CoreType * parr_core_type(Object * ctx);
+extern void parr_core_type(CoreType * ct, Object * ctx);
 
 extern int CT_EXPR;
-extern CoreType * expr_core_type(Object * ctx);
+extern void expr_core_type(CoreType * ct, Object * ctx);
+
+extern int CT_METH;
+WORD make_method(WORD args, WORD body);
+WORD apply_method(WORD msg, WORD obj, Object * expr, Object * caller_ctx);
+extern void meth_core_type(CoreType * ct, Object * ctx);

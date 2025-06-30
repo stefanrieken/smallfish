@@ -24,8 +24,21 @@ void print_int(WORD val) {
     printf("%d", as_int(val));
 }
 
-CoreType * int_core_type(Object * ctx) {
-    Object * type = make_class(ctx, "Int", nil, nil);
+bool parse_int1(int * ch, WORD * result) {
+    bool success = false;
+    WORD value = 0;
+    while (*ch >= '0' && *ch <= '9') {
+        success = true;
+        value = value * 10 + (*ch - '0');
+        *ch = getchar();
+    }
+    *result = tag_int(value);
+    return success;
+}
+
+void int_core_type(CoreType * ct, Object * ctx) {
+    Object * type = ct->type;
+    define(ctx, string_literal("Int"), tag_obj(type));
     define(type, string_literal("+"), make_prim( plus_cb));
     define(type, string_literal("-"), make_prim(  min_cb));
     define(type, string_literal("*"), make_prim(times_cb));
@@ -36,12 +49,10 @@ CoreType * int_core_type(Object * ctx) {
     define(type, string_literal("^"), make_prim(  xor_cb));
     define(type, string_literal("~"), make_prim( notb_cb));
 
-    CoreType * result = allocate(CoreType, 1);
-    result->type = type;
-    result->eval = eval_to_self;
-    result->apply = NULL; // for now at least; but there are interesting ways to apply ints
-    result->print = print_int;
-    result->mark = NULL; // not a pointer
-    return result;
+    ct->eval = eval_to_self;
+    ct->apply = apply_to_self; // for now at least; but there are interesting ways to apply ints
+    ct->parse = parse_int1;
+    ct->print = print_int;
+    ct->mark = NULL; // not a pointer
 };
 

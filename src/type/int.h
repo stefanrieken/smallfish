@@ -1,2 +1,2 @@
 extern int CT_INT;
-CoreType * int_core_type(Object * ctx);
+CoreType * int_core_type(CoreType * ct, Object * ctx);
