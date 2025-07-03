@@ -7,6 +7,8 @@ DictEntry * lookup(Object * dict, WORD name);
 
 void ls(Object * ctx, WORD val);
 
+void set_parent(Object * obj, Object * parent);
+
 void gc_mark_dict(Object * dict);
 
 extern int CT_DICT;

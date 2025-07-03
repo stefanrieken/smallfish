@@ -6,6 +6,7 @@
 #include "gc.h"
 
 #include "type/int.h"
+#include "type/object.h"
 #include "type/string.h"
 #include "type/expr.h"
 #include "type/dict.h"
@@ -50,7 +51,21 @@ Object * add_object(ObjectTable ** table, void * value, int type, Object * type1
 }
 
 WORD STR_EVAL;
+WORD STR_PRINT;
 
+// 1-arg message
+WORD message1(WORD obj, WORD name, Object * ctx) {
+    if (obj == nil) return nil;
+    WORD type = is_int(obj) ? tag_obj(core_types[CT_INT]->type) : as_obj(obj)->type1;
+    DictEntry * entry = lookup(as_obj(type),name);
+    if (entry == NULL) return obj;
+    if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(entry->value, obj, NULL, ctx);
+    if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_METH]->type)) return apply_method(entry->value, obj, NULL, ctx);
+    return entry->value; // allow value to be called as method
+}
+
+// Not using the above 1-arg message function, so as to allow for some (e.g. int)
+// respective to really calling 'eval' for everything.
 WORD eval(WORD val, Object * ctx) {
     if (is_int(val)) return val;
     // else
@@ -64,14 +79,9 @@ WORD eval(WORD val, Object * ctx) {
 //    return core_types[obj->type]->eval(val, ctx);
 }
 
-void print_val(WORD val) {
-    if (is_obj(val)) {
-        Object * obj = as_obj(val);
-        if (obj == objects) printf("(nil)");
-        else core_types[obj->type]->print(val);
-    } else {
-        printf("%d", as_int(val));
-    }
+void print_val(WORD val, Object * ctx) {
+    if (val == nil) printf("(nil)");
+    else message1(val, STR_PRINT, ctx);
 }
 
 // TODO this registry can only be completely constructed dynamically
@@ -79,6 +89,7 @@ void print_val(WORD val) {
 int num_core_types;
 CoreType ** core_types;
 
+Object * root;
 int main (int argc, char ** argv) {
     objects = allocate(Object, 1024);
     objects[0].size=1024; // ONLY for this entry, count size in num entries
@@ -91,13 +102,13 @@ int main (int argc, char ** argv) {
     // Predict indices for bootstrapping purposes.
     // (Do not just move these types to the front of thelist,
     // as the list is in order of GC complexity)
-    CT_PRIM = 1;
-    CT_STRING_RO = 2;
-    CT_DICT = 4;
+    CT_PRIM = 2;
+    CT_STRING_RO = 3;
+    CT_DICT = 5;
 
-    Object * root = add_object(&objects, make_dict(nil, 1), CT_DICT, NULL, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
+    root = add_object(&objects, make_dict(nil, 1), CT_DICT, NULL, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
 
-    num_core_types = 8;
+    num_core_types = 9;
     core_types = allocate(CoreType *, num_core_types);
 
     // Initialize stub core type class objects
@@ -107,6 +118,11 @@ int main (int argc, char ** argv) {
     }
 
     int idx = 0;
+
+    CT_OBJ  = idx; obj_core_type(core_types[idx++], root);
+    for (int i=1;i<num_core_types;i++) {
+        set_parent(core_types[i]->type, core_types[CT_OBJ]->type);
+    }
 
     CT_INT  = idx; int_core_type(core_types[idx++], root);
 
@@ -135,6 +151,7 @@ int main (int argc, char ** argv) {
     define(root, string_literal("help"), tag_obj(string_literal("Type 'env ls' to list global defintions. Type e.g. 'Int ls' to find integer methods.")));
 
     STR_EVAL = tag_obj(string_literal("eval"));
+    STR_PRINT = tag_obj(string_literal("print"));
 
     PERMGEN = objects[0].value.count;
     printf("READY.\n> ");
@@ -142,7 +159,7 @@ int main (int argc, char ** argv) {
     WORD result = parse_expr(&ch, '\n');
     while(result != nil) { // TODO adjust parse_expr to return proper end value
         result = eval(result, root);
-        printf("["); print_val(result); printf("] Ok.\n> ");
+        printf("["); print_val(result, root); printf("] Ok.\n> ");
         ch = read_non_whitespace_char('\n');
         result = parse_expr(&ch, '\n');
     }

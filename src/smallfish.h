@@ -130,7 +130,7 @@ typedef struct CoreType {
     WORD (*eval)(WORD val, Object * ctx);
     WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx);
     bool (*parse)(int * ch, WORD * result);
-    void (*print)(WORD val); // 'type' should define the same, or a more specific, print function
+    void (*print)(WORD val, Object * ctx); // TODO remove: 'type' should define the same, or a more specific, print function
     void (*mark)(Object * obj); // aka gc_mark
 } CoreType;
 
@@ -139,10 +139,12 @@ extern CoreType ** core_types;
 
 WORD eval(WORD val, Object * ctx);
 
-void print_val(WORD val);
+void print_val(WORD val, Object * ctx);
 
 // We keep just one object table (so not e.g. group all string literals),
 // because I want to keep the indices into this table simple.
 extern ObjectTable * objects;
+
+//extern Object * root;
 
 Object * add_object(ObjectTable ** table, void * value, int type, Object * type1, int size);

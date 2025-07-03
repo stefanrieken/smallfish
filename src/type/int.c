@@ -20,8 +20,11 @@ WORD   orb_cb(Object * ctx, WORD obj, WORD arg1) {  return tag_int(as_int(obj)|a
 WORD   xor_cb(Object * ctx, WORD obj, WORD arg1) {  return tag_int(as_int(obj)^as_int(eval(arg1, ctx))); }
 WORD  notb_cb(Object * ctx, WORD obj) {  return tag_int(~as_int(obj)); }
 
-void print_int(WORD val) {
+void print_int(WORD val, Object * ctx) {
     printf("%d", as_int(val));
+}
+void print_int_cb(Object * ctx, WORD val) {
+    return print_int(val, ctx);
 }
 
 bool parse_int1(int * ch, WORD * result) {
@@ -39,6 +42,7 @@ bool parse_int1(int * ch, WORD * result) {
 void int_core_type(CoreType * ct, Object * ctx) {
     Object * type = ct->type;
     define(ctx, string_literal("Int"), tag_obj(type));
+    define(type, string_literal("print"), make_prim(print_int_cb));
     define(type, string_literal("+"), make_prim( plus_cb));
     define(type, string_literal("-"), make_prim(  min_cb));
     define(type, string_literal("*"), make_prim(times_cb));

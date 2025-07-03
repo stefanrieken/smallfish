@@ -1,9 +1,9 @@
 #CFLAGS=-Wall -Os
-CFLAGS=-Wall -ggdb
+CFLAGS=-Wall -g
 
 %.c : %.h
 
-smallfish: src/smallfish.c src/parse.c src/gc.c src/type/dict.c src/type/expr.c src/type/string.c src/type/int.c src/type/prim.c
+smallfish: src/smallfish.c src/parse.c src/gc.c src/type/dict.c src/type/expr.c src/type/string.c src/type/int.c src/type/prim.c src/type/object.c
 	gcc $(CFLAGS) $^ -o $@
 
 clean:

@@ -59,21 +59,19 @@ void gc_mark_obj_array(Object * obj_array) {
     }
 }
 
-extern void print_val(WORD val);
-
-void print_list(WORD val) {
+void print_list(WORD val, Object * ctx) {
     Object * expr = as_obj(val);
     for(int i=0; i<expr->size/sizeof(WORD);i++) {
-        print_val(expr->value.ws[i]);printf(" ");
+        print_val(expr->value.ws[i], ctx);printf(" ");
     }
 }
 
-void print_parr(WORD val) {
-    printf("[ "); print_list(val); printf("]");
+void print_parr(WORD val, Object * ctx) {
+    printf("[ "); print_list(val, ctx); printf("]");
 }
 
-void print_expr(WORD val) {
-    printf("( "); print_list(val); printf(")");
+void print_expr(WORD val, Object * ctx) {
+    printf("( "); print_list(val, ctx); printf(")");
 }
 
 #define OBJ_POS 0
@@ -116,7 +114,7 @@ void parr_core_type(CoreType * ct, Object * ctx) {
 
 void expr_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Expression"), tag_obj(ct->type));
-    ct->type->value.dict[0].value = tag_obj(core_types[CT_PARR]->type);
+    set_parent(ct->type, core_types[CT_PARR]->type);
 
     define(ct->type, string_literal("eval"), make_prim(eval_expr_cb));
 
@@ -155,13 +153,13 @@ printf("Args size: %d\n", args->size);
     return eval(body, ctx);
 }
 
-void print_method(WORD val) {
+void print_method(WORD val, Object * ctx) {
     printf("(a method)");
 }
 
 void meth_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Method"), tag_obj(ct->type));
-    ct->type->value.dict[0].value = tag_obj(core_types[CT_PARR]->type);
+    set_parent(ct->type, core_types[CT_PARR]->type);
 
     ct->eval = eval_to_self;
     ct->apply = apply_method;

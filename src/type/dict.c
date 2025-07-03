@@ -54,38 +54,45 @@ Object * make_class(Object * ctx, char * name, Object * type, WORD parent) {
 }
 
 DictEntry * lookup(Object * dict, WORD name) {
-    // TODO also search parents
-    
+    if(dict == objects) return NULL; // dict is nill
+
     // lookup last-defined-first
-//    for (int i=1; i<(dict->size/sizeof(DictEntry)); i++) {
-    for (int i=(dict->size/sizeof(DictEntry))-1; i>=0; i--) {
+    // Don't check parent pointer (has nil name)
+    for (int i=(dict->size/sizeof(DictEntry))-1; i>0; i--) {
         DictEntry * entry = &(dict->value.dict[i]);
         if (entry->name == name) {
             return entry;
         }// else printf("%s != %s\n", as_obj(entry->name)->value.str, as_obj(name)->value.str);
     }
+    // Continue search at parent
+    if(dict->size >0) return lookup(as_obj(dict->value.dict[0].value), name);
     return NULL;
 }
 
 WORD ls(Object * ctx, WORD val) {
     Object * dict = as_obj(val);
     if (dict->value.dict[0].value != nil) {
-        printf("Parent:\n");
+        printf("parent: "); print_val(dict->value.dict[0].value, ctx); printf("\n");
         ls(ctx, dict->value.dict[0].value);
+        printf("self:\n");
     }
 
     for (int i=1; i<(dict->size/sizeof(DictEntry)); i++) {
         DictEntry * entry = &(dict->value.dict[i]);
-        printf("%-10s : ", as_obj(entry->name)->value.str);
-        print_val(entry->value);
+        printf("  %-10s : ", as_obj(entry->name)->value.str);
+        print_val(entry->value, ctx);
         printf("\n");
     }
     return nil;
 }
 
 // Avoid using full 'ls' here
-void print_dict(WORD val) {
+void print_dict(WORD val, Object * ctx) {
     printf("(dictionary)");
+}
+
+void set_parent(Object * obj, Object * parent) {
+    obj->value.dict[0].value = tag_obj(parent);
 }
 
 // TODO at least so far we could just use gc_mark_obj_array
@@ -98,7 +105,7 @@ void gc_mark_dict(Object * dict) {
 }
 
 void dict_core_type(CoreType * ct, Object * ctx) {
-    define(ctx, string_literal("Dict"), tag_obj(ct->type));
+    define(ctx, string_literal("Dictionary"), tag_obj(ct->type));
 
     define(ct->type, string_literal("define"), make_prim(define_cb));
     define(ct->type, string_literal("ls"), make_prim( ls));

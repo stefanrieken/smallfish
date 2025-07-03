@@ -28,7 +28,7 @@ Object * string_literal(char * value) {
     value = copy(value);
     for (int i=1; i<objects->value.count;i++) {
         // TODO delegate to types or even classes
-        if(objects[i].type == CT_STRING_RO && strcmp((const char *) value, (const char *) objects[i].value.str) == 0) {
+        if(objects[i].type1 == tag_obj(core_types[CT_STRING_RO]->type) && strcmp((const char *) value, (const char *) objects[i].value.str) == 0) {
 //            printf("Found: %s\n", objects[i].value.str);
             return &(objects[i]);
         } else if (first_free == 0 && objects[i].refcount == GC_FREE) first_free = i;
@@ -38,8 +38,12 @@ Object * string_literal(char * value) {
     return add_object1(&objects, value, CT_STRING_RO, core_types[CT_STRING_RO]->type, strlen(value)+1, first_free == 0 ? 1 : first_free);
 }
 
-void print_string(WORD val) {
+void print_string(WORD val, Object * ctx) {
     printf("%s", as_obj(val)->value.str);
+}
+WORD print_string_cb(Object * ctx, WORD val) {
+    print_string(val, ctx);
+    return nil;
 }
 
 WORD resolve_label(WORD val, Object * ctx) {
@@ -81,6 +85,7 @@ bool parse_label(int * ch, WORD * result) {
 
 void label_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Label"), tag_obj(ct->type));
+    define(ct->type, string_literal("print"), make_prim(print_string_cb));
     define(ct->type, string_literal("eval"), make_prim(resolve_label_cb));
 
     ct->eval = resolve_label;
@@ -92,6 +97,7 @@ void label_core_type(CoreType * ct, Object * ctx) {
 
 void string_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("String"), tag_obj(ct->type));
+    define(ct->type, string_literal("print"), make_prim(print_string_cb));
 
     ct->eval = eval_to_self;
     ct->apply = NULL; // for now at least; maybe apply string == map key?

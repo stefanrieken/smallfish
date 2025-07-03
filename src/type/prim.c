@@ -9,7 +9,7 @@
 
 int CT_PRIM;
 
-void print_prim(WORD val) {
+void print_prim(WORD val, Object * ctx) {
     printf("(primitive)");
 }
 
