@@ -70,7 +70,7 @@ bool parse_label(int * ch, WORD * result) {
             *ch=getchar();
         }
     } else {
-        while (*ch != EOF && *ch != ';' && !is_whitespace_char(*ch) && !is_bracket(*ch)) {
+        while (*ch != EOF && *ch != ';' && !is_whitespace_char(*ch) && !is_bracket(*ch) && !is_binary_expr(*ch)) {
             buffer[i++] = *ch;
             *ch=getchar();
         }
@@ -88,10 +88,10 @@ void label_core_type(CoreType * ct, Object * ctx) {
     define(ct->type, string_literal("print"), make_prim(print_string_cb));
     define(ct->type, string_literal("eval"), make_prim(resolve_label_cb));
 
-    ct->eval = resolve_label;
+//    ct->eval = resolve_label;
     ct->apply = NULL;
     ct->parse = parse_label;
-    ct->print = print_string;
+//    ct->print = print_string;
     ct->mark = gc_mark_none; // retain system strings
 };
 
@@ -99,10 +99,9 @@ void string_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("String"), tag_obj(ct->type));
     define(ct->type, string_literal("print"), make_prim(print_string_cb));
 
-    ct->eval = eval_to_self;
+//    ct->eval = eval_to_self;
     ct->apply = NULL; // for now at least; maybe apply string == map key?
     ct->parse = parse_label;
-    ct->print = print_string;
     ct->mark = gc_mark_none; // TODO write correct gc function (should be simple)
 };
 

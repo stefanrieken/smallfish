@@ -4,5 +4,7 @@ extern int CT_STRING;
 Object * make_string(char * value);
 Object * string_literal(char * value);
 
+WORD resolve_label(WORD val, Object * ctx);
+
 CoreType *  label_core_type(CoreType * ct, Object * ctx);
 CoreType * string_core_type(CoreType * ct, Object * ctx);

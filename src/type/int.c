@@ -53,10 +53,9 @@ void int_core_type(CoreType * ct, Object * ctx) {
     define(type, string_literal("^"), make_prim(  xor_cb));
     define(type, string_literal("~"), make_prim( notb_cb));
 
-    ct->eval = eval_to_self;
+//    ct->eval = eval_to_self;
     ct->apply = apply_to_self; // for now at least; but there are interesting ways to apply ints
     ct->parse = parse_int1;
-    ct->print = print_int;
     ct->mark = NULL; // not a pointer
 };
 

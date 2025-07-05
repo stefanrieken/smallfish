@@ -59,6 +59,11 @@ void gc_mark_obj_array(Object * obj_array) {
     }
 }
 
+WORD mark_array_cb(Object * ctx, WORD val) {
+    gc_mark_obj_array(as_obj(val));
+    return nil;
+}
+
 void print_list(WORD val, Object * ctx) {
     Object * expr = as_obj(val);
     for(int i=0; i<expr->size/sizeof(WORD);i++) {
@@ -106,9 +111,9 @@ WORD eval_expr_cb(Object * ctx, WORD expr) {
 void parr_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Array"), tag_obj(ct->type));
 
-    ct->eval = eval_to_self;
+//    ct->eval = eval_to_self;
     ct->parse = parse_array;
-    ct->print = print_parr;
+//    ct->print = print_parr;
     ct->mark = gc_mark_obj_array;
 };
 
@@ -118,10 +123,10 @@ void expr_core_type(CoreType * ct, Object * ctx) {
 
     define(ct->type, string_literal("eval"), make_prim(eval_expr_cb));
 
-    ct->eval = eval_expr;
+//    ct->eval = eval_expr;
     ct->apply = NULL; // for now; but TODO expr == native code?
     ct->parse = parse_subexpr;
-    ct->print = print_expr;
+//    ct->print = print_expr;
     ct->mark = gc_mark_obj_array;
 };
 
@@ -161,8 +166,8 @@ void meth_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Method"), tag_obj(ct->type));
     set_parent(ct->type, core_types[CT_PARR]->type);
 
-    ct->eval = eval_to_self;
+//    ct->eval = eval_to_self;
     ct->apply = apply_method;
-    ct->print = print_method;
+//    ct->print = print_method;
     ct->mark = gc_mark_obj_array;
 }

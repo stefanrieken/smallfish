@@ -70,13 +70,26 @@ WORD eval(WORD val, Object * ctx) {
     if (is_int(val)) return val;
     // else
     Object * obj = as_obj(val);
+#ifdef QUICK_EVAL
+    // As you can see here, making all objects `evaluable` is a bit of overkill; it is also
+    // not intrinsic to the object, but rather only applicable in one specific interpreter context.
+    // From this perspective, this 'party trick' it is certainly not morally superior to encoding
+    // interpreter behaviour in the interpreter itself, which is what we do here.
+    //
+    // (Note: this applies to evaluating arguments only. To apply methods, different bits of
+    // theory and pragmatics apply; see e.g. `message` above.)
+    if (as_obj(obj->type1) == core_types[CT_STRING_RO]->type) return resolve_label(val, ctx);
+    if (as_obj(obj->type1) == core_types[CT_EXPR]->type) return eval_expr(val, ctx);
+    return val; // eval to self; this is also true for blocks, methods etc. (only exception MAYBE implicit binding)
+#else
+    // Evaluate objects using the object's class' `eval` function.
+    // As evident from the above, the vast majority of types should eval to self.
     DictEntry * entry = lookup(as_obj(obj->type1), STR_EVAL);
-    if (entry == NULL) return val;
+    if (entry == NULL) return val; // If we don't suppply a default `eval` method, e.g. with Object
     if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(entry->value, val, NULL, ctx);
     if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_METH]->type)) return apply_method(entry->value, val, NULL, ctx);
     return entry->value; // Umm, let's say eval func is actually int 42; return that?
-
-//    return core_types[obj->type]->eval(val, ctx);
+#endif
 }
 
 void print_val(WORD val, Object * ctx) {

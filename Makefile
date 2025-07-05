@@ -1,5 +1,5 @@
 #CFLAGS=-Wall -Os
-CFLAGS=-Wall -g
+CFLAGS=-Wall -g -DQUICK_EVAL
 
 %.c : %.h
 

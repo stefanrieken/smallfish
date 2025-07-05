@@ -103,16 +103,15 @@ void gc_mark_dict(Object * dict) {
         gc_mark(entry->value);
     }
 }
-
 void dict_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Dictionary"), tag_obj(ct->type));
-
+    define(ct->type, string_literal("mark"), make_prim(mark_array_cb)); // comes down to the same thing
     define(ct->type, string_literal("define"), make_prim(define_cb));
-    define(ct->type, string_literal("ls"), make_prim( ls));
+    define(ct->type, string_literal("ls"), make_prim(ls));
 
     ct->apply = NULL;
-    ct->eval = eval_to_self;
-    ct->print = print_dict;
+//    ct->eval = eval_to_self;
+//    ct->print = print_dict;
     ct->mark = gc_mark_dict;
 };
 

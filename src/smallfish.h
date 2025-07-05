@@ -127,11 +127,10 @@ typedef enum CoreTypeEnum {
 */
 typedef struct CoreType {
     Object * type;
-    WORD (*eval)(WORD val, Object * ctx);
-    WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx);
+//    WORD (*eval)(WORD val, Object * ctx);
+    WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx); // in use to run method types
     bool (*parse)(int * ch, WORD * result);
-    void (*print)(WORD val, Object * ctx); // TODO remove: 'type' should define the same, or a more specific, print function
-    void (*mark)(Object * obj); // aka gc_mark
+    void (*mark)(Object * obj); // aka gc_mark; TODO remove in favour of class based version
 } CoreType;
 
 extern int num_core_types;
