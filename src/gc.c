@@ -15,11 +15,7 @@ void gc_reset() {
     }
 }
 
-void gc_mark_none(Object * obj) {
-}
-
-// TODO gc_mark based on CoreType struct
-void gc_mark(WORD val) {
+void gc_mark(WORD val, Object * ctx) {
     if (is_int(val)) return;
 
     Object * entry = as_obj(val);
@@ -29,14 +25,8 @@ void gc_mark(WORD val) {
     entry->refcount++;
     if (entry->refcount > 1) return; // already visited
 
-    if (entry->type == CT_PARR) {
-        gc_mark_obj_array(entry);
-    } else if (entry->type == CT_EXPR) {
-        gc_mark_obj_array(entry);
-    } else if (entry->type == CT_DICT) {
-        gc_mark_dict(entry);
-    }
-    // No other types contain pointers
+    // Mark following type inheritance
+    message1(val, STR_MARK, ctx);
 }
 
 int gc_sweep() {
@@ -56,7 +46,8 @@ int gc_sweep() {
 
 WORD gc_cb(Object * env, WORD obj) {
     gc_reset();
-    gc_mark_dict(env); // true? env == obj == root ?
+    // obj is just this gc function; what we want to mark is every entry level object; like 'root'
+    gc_mark(tag_obj(env), env); // true? env == obj == root ?
     int result = gc_sweep();
     printf("Freed %d/%d object (slot)s\n", result, objects[0].value.count);
     return tag_int(result);

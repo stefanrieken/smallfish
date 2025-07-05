@@ -95,14 +95,6 @@ void set_parent(Object * obj, Object * parent) {
     obj->value.dict[0].value = tag_obj(parent);
 }
 
-// TODO at least so far we could just use gc_mark_obj_array
-void gc_mark_dict(Object * dict) {
-    for (int i=0; i<dict->size;i += sizeof(Dictionary)) {
-        DictEntry * entry = (DictEntry *) (dict->value.str+i);
-        gc_mark(entry->name);
-        gc_mark(entry->value);
-    }
-}
 void dict_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Dictionary"), tag_obj(ct->type));
     define(ct->type, string_literal("mark"), make_prim(mark_array_cb)); // comes down to the same thing
@@ -110,8 +102,5 @@ void dict_core_type(CoreType * ct, Object * ctx) {
     define(ct->type, string_literal("ls"), make_prim(ls));
 
     ct->apply = NULL;
-//    ct->eval = eval_to_self;
-//    ct->print = print_dict;
-    ct->mark = gc_mark_dict;
 };
 

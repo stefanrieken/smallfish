@@ -52,13 +52,14 @@ Object * add_object(ObjectTable ** table, void * value, int type, Object * type1
 
 WORD STR_EVAL;
 WORD STR_PRINT;
+WORD STR_MARK;
 
 // 1-arg message
 WORD message1(WORD obj, WORD name, Object * ctx) {
     if (obj == nil) return nil;
     WORD type = is_int(obj) ? tag_obj(core_types[CT_INT]->type) : as_obj(obj)->type1;
     DictEntry * entry = lookup(as_obj(type),name);
-    if (entry == NULL) return obj;
+    if (entry == NULL) { printf ("Method %s not found\n", as_obj(name)->value.str); return nil; }
     if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(entry->value, obj, NULL, ctx);
     if (as_obj(entry->value)->type1 == tag_obj(core_types[CT_METH]->type)) return apply_method(entry->value, obj, NULL, ctx);
     return entry->value; // allow value to be called as method
@@ -165,6 +166,7 @@ int main (int argc, char ** argv) {
 
     STR_EVAL = tag_obj(string_literal("eval"));
     STR_PRINT = tag_obj(string_literal("print"));
+    STR_MARK = tag_obj(string_literal("mark"));
 
     PERMGEN = objects[0].value.count;
     printf("READY.\n> ");

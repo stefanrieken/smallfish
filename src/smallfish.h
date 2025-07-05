@@ -101,41 +101,23 @@ typedef struct ObjectTableEntry {
 WORD eval_to_self(WORD val, Object * ctx);
 // E.g. for class values to return themselves when called as method
 WORD apply_to_self(WORD msg, WORD obj, Object * args, Object * ctx);
-//
-// List the built-in, physical storage types.
-// These have a one-to-one / many-to-one map to system defined classes;
-// hence the exaggerated precision.
-//
-// It may in theory be possible to sub-class e.g. IntArray, but you cannot expect
-// to (bless MySubclass intArray), as there is no class pointer to change!
-/*
-typedef enum CoreTypeEnum {
-    // Direct value == int only (core type is implicit)
-    CT_INT,
-    // Permanent pointer values
-    CT_PRIM,           // Primitive; points directly to function
-    CT_BYTES_RO,       // Base type for byte array
-    CT_STRING_RO,      // Unique, read-only strings, also used for labels
-    // Allocated objects
-    CT_BYTES,          // Read / write
-    CT_STRING,         // Constructed strings
-    CT_INTS,           // int array
-    CT_PTRS,           // Includes Node
-    CT_EXPR,           // Fundamental building block for Code
-    CT_DICT            // Array of struct DictEntry    
-} CoreTypeEnum;
-*/
+
+// Register for the built-in, physical storage types.
 typedef struct CoreType {
     Object * type;
-//    WORD (*eval)(WORD val, Object * ctx);
     WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx); // in use to run method types
     bool (*parse)(int * ch, WORD * result);
-    void (*mark)(Object * obj); // aka gc_mark; TODO remove in favour of class based version
 } CoreType;
 
 extern int num_core_types;
 extern CoreType ** core_types;
 
+extern WORD STR_EVAL;
+extern WORD STR_PRINT;
+extern WORD STR_MARK;
+
+// 1-arg message (= 1-arg apply)
+WORD message1(WORD obj, WORD name, Object * ctx);
 WORD eval(WORD val, Object * ctx);
 
 void print_val(WORD val, Object * ctx);

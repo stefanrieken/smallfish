@@ -36,9 +36,6 @@ void prim_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Primitive"), tag_obj(ct->type));
     define(ct->type, string_literal("apply"), make_prim(apply_cb));
 
-//    ct->eval = eval_to_self;
     ct->apply = apply_prim;
-//    ct->print = print_prim;
-    ct->mark = gc_mark_none; // keep primitives
 };
 

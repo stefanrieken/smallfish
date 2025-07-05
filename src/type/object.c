@@ -25,8 +25,14 @@ void print_obj_cb(Object * ctx, WORD val) {
     printf("(an Object)");
 }
 
+void mark_none_cb(Object * ctx, WORD val) {
+    // do nothing
+}
+
+
 void obj_core_type(CoreType * ct, Object * ctx) {
     Object * type = ct->type;
     define(ctx, string_literal("Object"), tag_obj(type));
+    define(type, string_literal("mark"), make_prim(mark_none_cb));
     define(type, string_literal("print"), make_prim(print_obj_cb));
 }

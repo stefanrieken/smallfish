@@ -53,14 +53,14 @@ bool parse_array(int * ch, WORD * result) {
     return true;
 }
 
-void gc_mark_obj_array(Object * obj_array) {
-    for (int i=0; i<obj_array->size;i += sizeof(WORD)) {
-        gc_mark(obj_array->value.ws[i]);
+void gc_mark_obj_array(Object * obj_array, Object * ctx) {
+    for (int i=0; i<obj_array->size/sizeof(WORD);i ++) {
+        gc_mark(obj_array->value.ws[i], ctx);
     }
 }
 
 WORD mark_array_cb(Object * ctx, WORD val) {
-    gc_mark_obj_array(as_obj(val));
+    gc_mark_obj_array(as_obj(val), ctx);
     return nil;
 }
 
@@ -93,7 +93,7 @@ WORD eval_expr(WORD val, Object * ctx) {
     CoreType * type = is_int(obj) ? core_types[CT_INT] : core_types[as_obj(obj)->type];
     // TODO look up specific user-defined class
     DictEntry * entry = lookup(type->type, name);
-    if (entry == NULL) { printf ("%s not found\n", as_obj(name)->value.str); return nil; }
+    if (entry == NULL) { printf ("Method %s not found\n", as_obj(name)->value.str); return nil; }
 
     // apply
     WORD meth = entry->value;
@@ -110,11 +110,9 @@ WORD eval_expr_cb(Object * ctx, WORD expr) {
 
 void parr_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Array"), tag_obj(ct->type));
+    define(ct->type, string_literal("mark"), make_prim(mark_array_cb));
 
-//    ct->eval = eval_to_self;
     ct->parse = parse_array;
-//    ct->print = print_parr;
-    ct->mark = gc_mark_obj_array;
 };
 
 void expr_core_type(CoreType * ct, Object * ctx) {
@@ -123,11 +121,8 @@ void expr_core_type(CoreType * ct, Object * ctx) {
 
     define(ct->type, string_literal("eval"), make_prim(eval_expr_cb));
 
-//    ct->eval = eval_expr;
     ct->apply = NULL; // for now; but TODO expr == native code?
     ct->parse = parse_subexpr;
-//    ct->print = print_expr;
-    ct->mark = gc_mark_obj_array;
 };
 
 WORD make_method(WORD args, WORD body) {
@@ -166,8 +161,5 @@ void meth_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Method"), tag_obj(ct->type));
     set_parent(ct->type, core_types[CT_PARR]->type);
 
-//    ct->eval = eval_to_self;
     ct->apply = apply_method;
-//    ct->print = print_method;
-    ct->mark = gc_mark_obj_array;
 }
