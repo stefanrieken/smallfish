@@ -46,13 +46,6 @@ WORD define_cb(Object * ctx, WORD dict, WORD name, WORD val, WORD body) {
     return define1(as_obj(dict), name, eval(val, ctx))->value;
 }
 
-
-Object * make_class(Object * ctx, char * name, Object * type, WORD parent) {
-    Object * obj = add_object(&objects, make_dict(parent, 1), CT_DICT, type, sizeof(DictEntry) * 1);
-    define(ctx, string_literal(name),tag_obj(obj));
-    return obj;
-}
-
 DictEntry * lookup(Object * dict, WORD name) {
     if(dict == objects) return NULL; // dict is nill
 
@@ -71,6 +64,7 @@ DictEntry * lookup(Object * dict, WORD name) {
 
 WORD ls(Object * ctx, WORD val) {
     Object * dict = as_obj(val);
+printf("Dcit size %d\n", dict->size);
     if (dict->value.dict[0].value != nil) {
         printf("parent: "); print_val(dict->value.dict[0].value, ctx); printf("\n");
         ls(ctx, dict->value.dict[0].value);

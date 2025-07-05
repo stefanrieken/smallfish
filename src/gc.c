@@ -3,6 +3,7 @@
 #include "smallfish.h"
 #include "gc.h"
 
+#include "type/prim.h"
 #include "type/string.h"
 #include "type/expr.h"
 #include "type/dict.h"
@@ -32,7 +33,7 @@ void gc_mark(WORD val, Object * ctx) {
 int gc_sweep() {
     int freed = 0;
     for (int i=PERMGEN; i<objects->value.count;i++) {
-        if (objects[i].refcount == 0 && objects[i].type > CT_STRING_RO) { // Values below this are not deallocatable
+        if (objects[i].refcount == 0 && objects[i].type != tag_obj(core_types[CT_PRIM]->type) && objects[i].type != tag_obj(core_types[CT_STRING_RO]->type)) { // Values below this are not deallocatable
             // printf("freeing %d\n", objects[i].type);
             free(objects[i].value.ptr);
             objects[i].refcount = GC_FREE;
@@ -49,6 +50,6 @@ WORD gc_cb(Object * env, WORD obj) {
     // obj is just this gc function; what we want to mark is every entry level object; like 'root'
     gc_mark(tag_obj(env), env); // true? env == obj == root ?
     int result = gc_sweep();
-    printf("Freed %d/%d object (slot)s\n", result, objects[0].value.count);
+    printf("Freed %d/%d objects.\n", result, objects[0].value.count);
     return tag_int(result);
 }

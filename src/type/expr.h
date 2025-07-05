@@ -1,7 +1,7 @@
 WORD parse_expr(int * ch, char until);
 
-void print_expr(WORD val);
-int gc_mark_obj_array(Object * obj_array);
+void print_expr(WORD val, Object * ctx);
+void gc_mark_obj_array(Object * obj_array, Object * ctx);
 WORD mark_array_cb(Object * ctx, WORD val);
 WORD eval_expr(WORD val, Object * ctx);
 

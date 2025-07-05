@@ -11,26 +11,6 @@
 // Our own word size
 #define WORD uint32_t
 
-// Helpers to make nicely aligned structs
-#if UINTPTR_MAX == UINT64_MAX
-
-#define HALFPTR uint32_t
-#define QUARTPTR uint16_t
-#define MAX_QUART UINT16_MAX
-#define MSB (1 << 63)
-
-#else
-
-#define HALFPTR uint16_t
-#define QUARTPTR uint8_t
-#define QUARTPTR int8_t
-#define MAX_QUART UINT8_MAX
-#define MSB (1 << 31)
-
-#endif
-
-#define GC_FREE MAX_QUART
-
 // Index #0 == nil; but tagged == 1(!!!)
 #define nil 1
 // These are the classics, but I guess...
@@ -44,39 +24,19 @@
 #define as_obj(tagged) ptr(tagged >> 1)
 #define as_int(tagged) (tagged >> 1)
 
-// 'lazy' evaluation actually makes the individual primitives do
-// more active work by evaluating their own argument expressions.
-// With 'eager' evaluation, the interpreter will pre-eval all
-// expressions except for 'special' arguments (= the block
-// argumnents to 'if', etc.
-#ifdef LAZY
-#define e(val,ctx) (eval(val,ctx))
-#else
-#define e(val,ctx) val
-#endif
-
-// LSB == indicator bit; so
-
-// I'm NOT a fan of taking bits off perfectly good integers,
-// but ultimately this is the more flexible method of in-lining
-// integer values.
-
-
 typedef struct DictEntry {
-    WORD name;// : 31;
-//    bool is_ptr : 1;
+    WORD name;
     WORD value;
 } Dictionary, DictEntry;
 
 // Object table (Entry)
 // All allocated objects are stored in the object table,
-// and referenced using indirect pointers, so that:x	
+// and referenced using indirect pointers, so that:
 // - we retain a pointer to orphaned objects
 // - we can centrally change pointers after realloc
-// - we can use this to track the object's size
+// - we can offload the responsiblity for basic metadata, like size
 //
-// The allocation status of the object table itself is stored in entry #0 .
-
+// The allocation status of the object table itself is stored in entry #0 (TODO not the best way).
 typedef struct ObjectTableEntry {
     // Putting value first because I imagine it makes for the simplest dereferencing
     union {
@@ -87,12 +47,15 @@ typedef struct ObjectTableEntry {
         int count; // only for entry #0!
     } value;
 
-    HALFPTR size;
-    QUARTPTR refcount; // or GC mark, or whatever
-    QUARTPTR type; // struct CoreType; TODO replace with:
-    HALFPTR type1; // object class
+    // On 64-bit systems, this struct totals to 16 bytes (2 x 64 bits)
+    // On 32-bit systems, this struct totals to 12 bytes (3 x 32 bits)
+    uint16_t size;
+    uint16_t refcount; // Could be only 1 'gc_mark' bit; but refcount MAY get use when actively cleaning up objects like stack frames
+    uint32_t type; // object class; NOTE this assumes WORD <= 32 bits
 
 } ObjectTable, Object;
+
+#define GC_FREE UINT16_MAX
 
 //
 // Core type support
@@ -128,4 +91,4 @@ extern ObjectTable * objects;
 
 //extern Object * root;
 
-Object * add_object(ObjectTable ** table, void * value, int type, Object * type1, int size);
+Object * add_object(ObjectTable ** table, void * value, Object * type, int size);

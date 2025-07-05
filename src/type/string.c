@@ -11,7 +11,7 @@
 int CT_STRING_RO;
 int CT_STRING;
 
-extern Object * add_object1(ObjectTable ** table, void * value, int type, Object * type1, int size, int search_from);
+extern Object * add_object1(ObjectTable ** table, void * value, Object * type, int size, int search_from);
 
 char * copy(char * str) {
     char * copy = allocate(char,strlen(str)+1);
@@ -20,22 +20,21 @@ char * copy(char * str) {
 }
 
 Object * make_string(char * value) {
-    return add_object(&objects, copy(value), CT_STRING, core_types[CT_STRING]->type, strlen(value)+1);
+    return add_object(&objects, copy(value), core_types[CT_STRING]->type, strlen(value)+1);
 }
 
 Object * string_literal(char * value) {
     int first_free = 0;
     value = copy(value);
     for (int i=1; i<objects->value.count;i++) {
-        // TODO delegate to types or even classes
-        if(objects[i].type1 == tag_obj(core_types[CT_STRING_RO]->type) && strcmp((const char *) value, (const char *) objects[i].value.str) == 0) {
+        if(objects[i].type == tag_obj(core_types[CT_STRING_RO]->type) && strcmp((const char *) value, (const char *) objects[i].value.str) == 0) {
 //            printf("Found: %s\n", objects[i].value.str);
             return &(objects[i]);
         } else if (first_free == 0 && objects[i].refcount == GC_FREE) first_free = i;
     }
     // Not found; add
     //printf("First free: %d\n", first_free);
-    return add_object1(&objects, value, CT_STRING_RO, core_types[CT_STRING_RO]->type, strlen(value)+1, first_free == 0 ? 1 : first_free);
+    return add_object1(&objects, value, core_types[CT_STRING_RO]->type, strlen(value)+1, first_free == 0 ? 1 : first_free);
 }
 
 void print_string(WORD val, Object * ctx) {
@@ -48,7 +47,7 @@ WORD print_string_cb(Object * ctx, WORD val) {
 
 WORD resolve_label(WORD val, Object * ctx) {
     DictEntry * entry = lookup(ctx, val);
-    if (entry == NULL) return val;
+    if (entry == NULL) { printf("Unresolved variable %s\n", as_obj(val)->value.str); ls(ctx, tag_obj(ctx)); return val; }
     return entry->value;
 }
 

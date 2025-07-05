@@ -4,6 +4,7 @@
 #include "../parse.h"
 #include "../gc.h"
 
+#include "expr.h"
 #include "dict.h"
 #include "prim.h"
 #include "string.h"
@@ -28,9 +29,10 @@ WORD parse_expr(int * ch, char until) {
         if (*ch != EOF && *ch != until && is_whitespace_char(*ch)) *ch = read_non_whitespace_char(until);
     }
     if (idx == 0) { return nil; } // no result
-    if (idx == 1) { WORD result = expr[0]; free(expr); return result; }
+    // allow single-value (sub)expression to be just the value
+    if (idx == 1 && until == ')') { WORD result = expr[0]; free(expr); return result; }
 
-    return tag_obj(add_object(&objects, expr, CT_EXPR, core_types[CT_EXPR]->type, sizeof(WORD) * size));
+    return tag_obj(add_object(&objects, expr, core_types[CT_EXPR]->type, sizeof(WORD) * size));
 }
 
 // Provide this function in the CoreType struct, as
@@ -49,7 +51,7 @@ bool parse_array(int * ch, WORD * result) {
     *result = parse_expr(ch, ']');
     *ch = getchar();
 
-    as_obj(*result)->type = CT_PARR;
+    as_obj(*result)->type = tag_obj(core_types[CT_PARR]->type);
     return true;
 }
 
@@ -71,11 +73,11 @@ void print_list(WORD val, Object * ctx) {
     }
 }
 
-void print_parr(WORD val, Object * ctx) {
+void print_parr_cb(Object * ctx, WORD val) {
     printf("[ "); print_list(val, ctx); printf("]");
 }
 
-void print_expr(WORD val, Object * ctx) {
+void print_expr_cb(Object * ctx, WORD val) {
     printf("( "); print_list(val, ctx); printf(")");
 }
 
@@ -90,18 +92,25 @@ WORD eval_expr(WORD val, Object * ctx) {
     if (expr->size == 1*sizeof(WORD)) return obj;
     WORD name = expr->value.ws[MSG_POS];
 
-    CoreType * type = is_int(obj) ? core_types[CT_INT] : core_types[as_obj(obj)->type];
-    // TODO look up specific user-defined class
-    DictEntry * entry = lookup(type->type, name);
+    Object * type = is_int(obj) ? core_types[CT_INT]->type : as_obj(as_obj(obj)->type);//core_types[as_obj(obj)->type];
+    DictEntry * entry = lookup(type, name);
     if (entry == NULL) { printf ("Method %s not found\n", as_obj(name)->value.str); return nil; }
 
     // apply
-    WORD meth = entry->value;
-    //printf("Method %d %d type: %d\n", meth, is_int(meth), is_int(meth) ? CT_INT : as_obj(meth)->type);
-    CoreType * mtype = is_int(meth) ? core_types[CT_INT] : core_types[as_obj(meth)->type];
-    //printf("Apply method: %p\n", mtype->apply);
-    return mtype->apply(meth, obj, expr, ctx);
+    // TODO: this is the same code snippet as in `message1`; defer both to a centralized `apply` instead.
 
+    // Assume for now: method is always either CT_METH or CT_PRIM
+    // We could support other core type methods, but then the simplest way to support them is
+    // to directly add their evaluators here.
+    WORD meth = entry->value;
+    if (as_obj(meth)->type == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(meth, obj, expr, ctx);
+    if (as_obj(meth)->type == tag_obj(core_types[CT_METH]->type)) return apply_method(meth, obj, expr, ctx);
+    // If type is neither prim nor meth, consider looking up an 'apply' function on the method's type.
+    // Note: this can become  a bit of a recursive rabbit hole, so let's leave it out for now.
+//    Object * mtype = is_int(meth) ? core_types[CT_INT] : as_obj(as_obj(meth)->type);
+//    return message1(obj, STR_APPLY, ctx);
+    printf("Can't eval method type\n");
+    return nil;
 }
 
 WORD eval_expr_cb(Object * ctx, WORD expr) {
@@ -111,6 +120,7 @@ WORD eval_expr_cb(Object * ctx, WORD expr) {
 void parr_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Array"), tag_obj(ct->type));
     define(ct->type, string_literal("mark"), make_prim(mark_array_cb));
+    define(ct->type, string_literal("print"), make_prim(print_parr_cb));
 
     ct->parse = parse_array;
 };
@@ -119,6 +129,7 @@ void expr_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Expression"), tag_obj(ct->type));
     set_parent(ct->type, core_types[CT_PARR]->type);
 
+    define(ct->type, string_literal("print"), make_prim(print_expr_cb));
     define(ct->type, string_literal("eval"), make_prim(eval_expr_cb));
 
     ct->apply = NULL; // for now; but TODO expr == native code?
@@ -129,37 +140,40 @@ WORD make_method(WORD args, WORD body) {
     WORD * method = allocate(WORD, 2);
     method[0] = args;
     method[1] = body;
-    return tag_obj(add_object(&objects, method, CT_METH, core_types[CT_METH]->type, sizeof(WORD) * 2));
+    return tag_obj(add_object(&objects, method, core_types[CT_METH]->type, sizeof(WORD) * 2));
 }
 
 WORD apply_method(WORD msg, WORD obj, Object * expr, Object * caller_ctx) {
     Object * meth = as_obj(msg);
-    Object * args = as_obj(meth->value.ws[0]);
+    Object * args = as_obj(meth->value.ws[0]); // = actually argnames
     WORD body = meth->value.ws[1];
-printf("Args size: %d\n", args->size);
-    Object * ctx = add_object(&objects, allocate(uint8_t, args->size*2), CT_DICT, core_types[CT_DICT]->type, args->size*2);
-    // TODO finally properly work out dict parent, type,
-    // otherwise we also cannot access instance variables
+//printf("Num args: %d\n", args->size / sizeof(WORD));
+    Object * ctx = add_object(&objects, allocate(uint8_t, (args->size+sizeof(WORD))*2), core_types[CT_DICT]->type, (args->size+sizeof(WORD))*2);
+    // Set obj argument as search parent, ONLY IF it is a dict (TODO change lookup so that it can be a named parent)
     ctx->value.dict[0].name = nil;
-    ctx->value.dict[0].value = nil;
+    ctx->value.dict[0].value = obj == tag_obj(core_types[CT_DICT]->type) ? obj : nil;
+    // Set obj argument (TODO merge with above)
+//printf("Setting name %s\n", as_obj(args->value.ws[0])->value.str);
     ctx->value.dict[1].name = args->value.ws[0];
-    ctx->value.dict[1].value = expr->value.ws[OBJ_POS];
-
+    ctx->value.dict[1].value = obj;
+    // Add rest of arguments
     for (int i=1; i<args->size/sizeof(WORD); i++) {
+//printf("Setting name %s\n", as_obj(args->value.ws[i])->value.str);
         ctx->value.dict[i+1].name = args->value.ws[i];
         ctx->value.dict[i+1].value = eval(expr->value.ws[i+1], caller_ctx);
     }
-
+//printf("Eval'ing method body\n");
     return eval(body, ctx);
 }
 
-void print_method(WORD val, Object * ctx) {
-    printf("(a method)");
+void print_meth_cb(Object * ctx, WORD val) {
+    printf("method "); print_list(val, ctx);
 }
 
 void meth_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Method"), tag_obj(ct->type));
     set_parent(ct->type, core_types[CT_PARR]->type);
+    define(ct->type, string_literal("print"), make_prim(print_meth_cb));
 
     ct->apply = apply_method;
 }

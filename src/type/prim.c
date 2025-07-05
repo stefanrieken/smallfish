@@ -23,7 +23,7 @@ WORD apply_prim(WORD msg, WORD obj, Object * expr, Object * ctx) {
 }
 
 WORD make_prim(void * cb) {
-    return tag_obj(add_object(&objects, cb, CT_PRIM, core_types[CT_PRIM]->type, 0));
+    return tag_obj(add_object(&objects, cb, core_types[CT_PRIM]->type, 0));
 }
 
 WORD apply_cb(Object * ctx, WORD prim, WORD obj, WORD arg1, WORD arg2, WORD arg3) {
