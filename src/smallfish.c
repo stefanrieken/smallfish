@@ -8,7 +8,10 @@
 #include "type/int.h"
 #include "type/object.h"
 #include "type/string.h"
+#include "type/parr.h"
 #include "type/expr.h"
+#include "type/method.h"
+#include "type/block.h"
 #include "type/dict.h"
 #include "type/prim.h"
 
@@ -121,7 +124,7 @@ int main (int argc, char ** argv) {
 
     root = add_object(&objects, make_dict(nil, 1), NULL, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
 
-    num_core_types = 9;
+    num_core_types = 10;
     core_types = allocate(CoreType *, num_core_types);
 
     // Initialize stub core type class objects
@@ -152,6 +155,7 @@ int main (int argc, char ** argv) {
     CT_PARR      = idx; parr_core_type(core_types[idx++], root);
     CT_EXPR      = idx; expr_core_type(core_types[idx++], root);
     CT_METH      = idx; meth_core_type(core_types[idx++], root);
+    CT_BLOCK     = idx; block_core_type(core_types[idx++], root);
 
     if (idx > num_core_types) { printf("ERROR: core_types out of bounds!\n"); exit(-1); }
 

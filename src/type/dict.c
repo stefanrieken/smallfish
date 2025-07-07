@@ -6,7 +6,8 @@
 
 #include "string.h"
 #include "prim.h"
-#include "expr.h"
+#include "parr.h"
+#include "method.h"
 
 int CT_DICT;
 
@@ -22,7 +23,7 @@ DictEntry * define1(Object * dict, WORD name, WORD value) {
     DictEntry * entry = &(dict->value.dict[dict->size / sizeof(DictEntry)]);
     dict->size += sizeof(DictEntry);
 
-    entry->name=name;
+    entry->name=as_label(name);
     entry->value=value;
 
     return entry;
@@ -40,7 +41,7 @@ DictEntry * define(Object * dict, Object * name, WORD value) {
 WORD define_cb(Object * ctx, WORD dict, WORD name, WORD val, WORD body) {
     // TODO improve callback form to better detect number of args
     if (body != nil) {
-        return define1(as_obj(dict), name, make_method(val, body))->value;
+        return define1(as_obj(dict), name, make_method(val, body, ctx))->value;
     } else
     // Don't eval name, just demand it to be label
     return define1(as_obj(dict), name, eval(val, ctx))->value;
@@ -64,7 +65,6 @@ DictEntry * lookup(Object * dict, WORD name) {
 
 WORD ls(Object * ctx, WORD val) {
     Object * dict = as_obj(val);
-printf("Dcit size %d\n", dict->size);
     if (dict->value.dict[0].value != nil) {
         printf("parent: "); print_val(dict->value.dict[0].value, ctx); printf("\n");
         ls(ctx, dict->value.dict[0].value);
@@ -78,11 +78,6 @@ printf("Dcit size %d\n", dict->size);
         printf("\n");
     }
     return nil;
-}
-
-// Avoid using full 'ls' here
-void print_dict(WORD val, Object * ctx) {
-    printf("(dictionary)");
 }
 
 void set_parent(Object * obj, Object * parent) {

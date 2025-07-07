@@ -41,8 +41,9 @@ typedef struct ObjectTableEntry {
     // Putting value first because I imagine it makes for the simplest dereferencing
     union {
         void * ptr; // don't know, don't care
-        uint8_t * str;
+        char * str;
         WORD * ws; // word size (array) value
+        struct ObjectTableEntry * obj;
         DictEntry * dict;        
         int count; // only for entry #0!
     } value;
