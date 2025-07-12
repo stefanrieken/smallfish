@@ -43,11 +43,11 @@ Object * string_literal(char * value) {
     return add_object1(&objects, value, core_types[CT_STRING_RO]->type, strlen(value)+1, first_free == 0 ? 1 : first_free);
 }
 
-WORD print_label_cb(Object * ctx, WORD val) {
+WORD print_label_cb(WORD val, Object * expr, Object * ctx) {
     printf("%s", as_obj(val)->value.str);
     return nil;
 }
-WORD print_string_cb(Object * ctx, WORD val) {
+WORD print_string_cb(WORD val, Object * expr, Object * ctx) {
     // Find the value in the pointed-to Label
     printf("\"%s\"", as_obj(val)->value.obj->value.str);
     return nil;
@@ -55,11 +55,11 @@ WORD print_string_cb(Object * ctx, WORD val) {
 
 WORD resolve_label(WORD val, Object * ctx) {
     DictEntry * entry = lookup(ctx, val);
-    if (entry == NULL) { printf("Unresolved variable %s\n", as_obj(val)->value.str); ls(ctx, tag_obj(ctx)); return val; }
+    if (entry == NULL) { printf("Unresolved variable %s\n", as_obj(val)->value.str); ls(tag_obj(ctx), NULL, ctx); return val; }
     return entry->value;
 }
 
-WORD resolve_label_cb(Object * ctx, WORD val) {
+WORD resolve_label_cb(WORD val, Object * expr, Object * ctx) {
     return resolve_label(val, ctx);
 }
 

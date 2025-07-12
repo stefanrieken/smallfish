@@ -5,7 +5,7 @@ Object * make_class(Object * ctx, char * name, Object * type, WORD parent);
 
 DictEntry * lookup(Object * dict, WORD name);
 
-void ls(Object * ctx, WORD val);
+WORD ls(WORD val, Object * expr, Object * ctx);
 
 void set_parent(Object * obj, Object * parent);
 

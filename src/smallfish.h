@@ -62,14 +62,13 @@ typedef struct ObjectTableEntry {
 // Core type support
 //
 
-WORD eval_to_self(WORD val, Object * ctx);
-// E.g. for class values to return themselves when called as method
-WORD apply_to_self(WORD msg, WORD obj, Object * args, Object * ctx);
-
 // Register for the built-in, physical storage types.
 typedef struct CoreType {
     Object * type;
-    WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx); // in use to run method types
+    // Apply a method type to its arguments
+    // Since we can't derive CoreType from runtime object, this registry has little use over directly calling known
+    // apply / eval functions. But TODO MAYBE we want to create a small array for all 'applicable' types instead.
+    WORD (*apply)(WORD msg, WORD obj, Object * args, Object * ctx);
     bool (*parse)(int * ch, WORD * result);
 } CoreType;
 

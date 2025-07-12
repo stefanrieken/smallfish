@@ -42,8 +42,9 @@ bool parse_subexpr(int * ch, WORD * result) {
     return true;
 }
 
-void print_expr_cb(Object * ctx, WORD val) {
+WORD print_expr_cb(WORD val, Object * expr, Object * ctx) {
     printf("( "); print_list(val, ctx); printf(")");
+    return nil;
 }
 
 #define OBJ_POS 0
@@ -78,16 +79,11 @@ WORD eval_expr(WORD val, Object * ctx) {
     return nil;
 }
 
-WORD eval_expr_cb(Object * ctx, WORD expr) {
-    return eval_expr(expr, ctx);
-}
-
 void expr_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Expression"), tag_obj(ct->type));
     set_parent(ct->type, core_types[CT_PARR]->type);
 
     define(ct->type, string_literal("print"), make_prim(print_expr_cb));
-    define(ct->type, string_literal("eval"), make_prim(eval_expr_cb));
 
     ct->apply = NULL; // for now; but TODO expr == native code?
     ct->parse = parse_subexpr;

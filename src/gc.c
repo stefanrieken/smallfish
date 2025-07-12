@@ -45,7 +45,7 @@ int gc_sweep() {
     return freed;
 }
 
-WORD gc_cb(Object * env, WORD obj) {
+WORD gc_cb(WORD obj, Object * expr, Object * env) {
     gc_reset();
     // obj is just this gc function; what we want to mark is every entry level object; like 'root'
     gc_mark(tag_obj(env), env); // true? env == obj == root ?

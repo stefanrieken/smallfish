@@ -10,28 +10,38 @@
 
 int CT_OBJ;
 
-WORD type_cb(Object * ctx, WORD val) {
+WORD idx_cb(WORD val, Object * expr, Object * ctx) {
+    return is_int(val) ? tag_int(0) : tag_int(val >> 1);
+}
+
+WORD obj_eq_cb(WORD val, Object * expr, Object * ctx) {
+    return (val == eval(expr->value.ws[2], ctx)) ? tag_int(1) : nil; // TODO True / False
+}
+
+WORD type_cb(WORD val, Object * expr, Object * ctx) {
     return is_int(val) ? tag_obj(core_types[CT_INT]->type) : as_obj(val)->type;
 }
 
-void print_obj_cb(Object * ctx, WORD val) {
+WORD print_obj_cb(WORD val, Object * expr, Object * ctx) {
     for(int i=1;i<ctx->size/sizeof(DictEntry); i++) {
         if (ctx->value.dict[i].value == val) {
             printf("%s", as_obj(ctx->value.dict[i].name)->value.str);
-            return;
+            return nil;
         }
     }
     for(int i=1;i<ctx->size/sizeof(DictEntry); i++) {
         if (ctx->value.dict[i].value == as_obj(val)->type) {
             printf("(%s)", as_obj(ctx->value.dict[i].name)->value.str);
-            return;
+            return nil;
         }
     }
     printf("(an Object)");
+    return nil;
 }
 
-void mark_none_cb(Object * ctx, WORD val) {
+WORD mark_none_cb(WORD val, Object * expr, Object * ctx) {
     // do nothing
+    return nil;
 }
 
 
@@ -41,4 +51,6 @@ void obj_core_type(CoreType * ct, Object * ctx) {
     define(type, string_literal("mark"), make_prim(mark_none_cb));
     define(type, string_literal("type"), make_prim(type_cb));
     define(type, string_literal("print"), make_prim(print_obj_cb));
+    define(type, string_literal("idx"), make_prim(idx_cb));
+    define(type, string_literal("=="), make_prim(obj_eq_cb));
 }

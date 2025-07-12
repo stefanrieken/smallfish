@@ -14,11 +14,9 @@
 #include "type/block.h"
 #include "type/dict.h"
 #include "type/prim.h"
+#include "type/bool.h"
 
 ObjectTable * objects;
-
-WORD eval_to_self(WORD val, Object * ctx) { return val; }
-WORD apply_to_self(WORD msg, WORD obj, Object * args, Object * ctx) { return msg; }
 
 // search_from is a hint for a potential vacant slot
 Object * add_object1(ObjectTable ** table, void * value, Object * type, int size, int search_from) {
@@ -39,7 +37,7 @@ Object * add_object1(ObjectTable ** table, void * value, Object * type, int size
         (*table)->value.count++;
     }
 
-    result->type = tag_obj(type);
+    result->type = type == NULL ? nil : tag_obj(type);
     result->value.ptr = value;
     result->size = size;
     result->refcount = 0;
@@ -83,11 +81,12 @@ WORD eval(WORD val, Object * ctx) {
     // theory and pragmatics apply; see e.g. `message` above.)
     if (as_obj(obj->type) == core_types[CT_STRING_RO]->type) return resolve_label(val, ctx);
     if (as_obj(obj->type) == core_types[CT_EXPR]->type) return eval_expr(val, ctx);
+    if (as_obj(obj->type) == core_types[CT_BLOCK]->type) return eval_block(val, ctx);
     return val; // eval to self; this is also true for blocks, methods etc. (only exception MAYBE implicit binding)
 #else
     // Evaluate objects using the object's class' `eval` function.
     // As evident from the above, the vast majority of types should eval to self.
-    DictEntry * entry = lookup(as_obj(obj->type), STR_EVAL);
+    DictEntry * entry = lookup(as_obj(obj->type), STR_EVAL); // TODO add back `eval` callbacks for label, expr
     if (entry == NULL) return val; // If we don't suppply a default `eval` method, e.g. with Object
     if (as_obj(entry->value)->type == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(entry->value, val, NULL, ctx);
     if (as_obj(entry->value)->type == tag_obj(core_types[CT_METH]->type)) return apply_method(entry->value, val, NULL, ctx);
@@ -124,7 +123,7 @@ int main (int argc, char ** argv) {
 
     root = add_object(&objects, make_dict(nil, 1), NULL, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
 
-    num_core_types = 10;
+    num_core_types = 15;
     core_types = allocate(CoreType *, num_core_types);
 
     // Initialize stub core type class objects
@@ -132,6 +131,10 @@ int main (int argc, char ** argv) {
         core_types[i] = allocate(CoreType, 1);
         core_types[i]->type = add_object(&objects, make_dict(nil, 1), NULL, sizeof(DictEntry) * 1);
     }
+
+    STR_EVAL = tag_obj(string_literal("eval"));
+    STR_PRINT = tag_obj(string_literal("print"));
+    STR_MARK = tag_obj(string_literal("mark"));
 
     int idx = 0;
 
@@ -155,13 +158,22 @@ int main (int argc, char ** argv) {
     CT_PARR      = idx; parr_core_type(core_types[idx++], root);
     CT_EXPR      = idx; expr_core_type(core_types[idx++], root);
     CT_METH      = idx; meth_core_type(core_types[idx++], root);
+    CT_LAMBDA    = idx; lambda_core_type(core_types[idx++], root);
     CT_BLOCK     = idx; block_core_type(core_types[idx++], root);
+
+    CT_BOOL  = idx;  bool_core_type(core_types[idx++], root);
+    CT_TRUE  = idx;  true_core_type(core_types[idx++], root);
+    CT_FALSE = idx; false_core_type(core_types[idx++], root);
 
     if (idx > num_core_types) { printf("ERROR: core_types out of bounds!\n"); exit(-1); }
 
     // Back-fix dict type for all classes
     root->type = tag_obj(core_types[CT_DICT]->type);
-    for(int i=0;i<num_core_types;i++) core_types[i]->type->type = tag_obj(core_types[CT_DICT]->type);
+    for(int i=0;i<num_core_types;i++) {
+        if (core_types[i]->type->type == nil) {
+            core_types[i]->type->type = tag_obj(core_types[CT_DICT]->type);
+        }
+    }
 
     define(root, string_literal("env"), tag_obj(root));
     define(root, string_literal("gc"), make_prim(gc_cb));

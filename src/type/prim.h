@@ -1,9 +1,10 @@
 extern int CT_PRIM;
 
-WORD make_prim(void * cb);
-WORD apply_prim(WORD msg, WORD obj, Object * expr, Object * ctx);
+// NOTE: ctx is really only relevant as an argument
+// because of lazy evaluation.
+typedef WORD (*PrimitiveCb)(WORD obj, Object * expr, Object * ctx);
 
-// loose definition with arbitrary number of args
-typedef WORD (*PrimitiveCb)(Object * ctx, WORD obj, WORD arg1, WORD arg2, WORD arg3);
+WORD make_prim(PrimitiveCb cb);
+WORD apply_prim(WORD meth, WORD obj, Object * expr, Object * ctx);
 
 void prim_core_type(CoreType * ct, Object * ctx);

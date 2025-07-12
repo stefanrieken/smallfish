@@ -10,8 +10,10 @@
 #include "prim.h"
 #include "string.h"
 #include "int.h"
+#include "block.h"
 
 int CT_METH;
+int CT_LAMBDA;
 
 WORD make_method(WORD args, WORD body, Object * ctx) {
     WORD * method = allocate(WORD, 2);
@@ -20,31 +22,74 @@ WORD make_method(WORD args, WORD body, Object * ctx) {
     return tag_obj(add_object(&objects, method, core_types[CT_METH]->type, sizeof(WORD) * 2));
 }
 
-WORD apply_method(WORD msg, WORD obj, Object * expr, Object * caller_ctx) {
-    Object * meth = as_obj(msg);
+// More precisely, makes a lambda closure
+WORD make_lambda(WORD args, WORD body, Object * ctx) {
+    WORD * lambda = allocate(WORD, 2);
+    lambda[0] = eval(args, ctx); // If args is an array potentially containing expressions, then eval(args) is an array containing the resulting values
+    lambda[1] = body; // TODO body arg should be evaluable too. If block, (eval block) -> (bind env block) -> lambda closure?
+    return tag_obj(add_object(&objects, lambda, core_types[CT_LAMBDA]->type, sizeof(WORD) * 2));
+}
+
+WORD apply_native(WORD val, WORD obj, Object * expr, Object * caller_ctx, bool is_method) {
+    Object * meth = as_obj(val);
     Object * args = as_obj(meth->value.ws[0]); // = actually argnames
     WORD body = meth->value.ws[1];
-//printf("Num args: %d\n", args->size / sizeof(WORD));
+
     Object * ctx = add_object(&objects, allocate(uint8_t, (args->size+sizeof(WORD))*2), core_types[CT_DICT]->type, (args->size+sizeof(WORD))*2);
     // Set obj argument as search parent, ONLY IF it is a dict (TODO change lookup so that it can be a named parent)
     ctx->value.dict[0].name = nil;
     ctx->value.dict[0].value = obj == tag_obj(core_types[CT_DICT]->type) ? obj : nil;
-    // Set obj argument
-//printf("Setting name %s\n", as_obj(args->value.ws[0])->value.str);
-    ctx->value.dict[1].name = as_label(args->value.ws[0]);
-    ctx->value.dict[1].value = obj;
-    // Add rest of arguments
-    for (int i=1; i<args->size/sizeof(WORD); i++) {
-//printf("Setting name %s\n", as_obj(args->value.ws[i])->value.str);
-        ctx->value.dict[i+1].name = as_label(args->value.ws[i]);
-        ctx->value.dict[i+1].value = eval(expr->value.ws[i+1], caller_ctx);
+
+    if (is_method) {
+        // Set obj argument
+        ctx->value.dict[1].name = as_label(args->value.ws[0]);
+        ctx->value.dict[1].value = obj;
     }
-//printf("Eval'ing method body\n");
-    return eval(body, ctx);
+
+    if (args != objects) { // = nil
+        // Add rest of arguments
+        for (int i=is_method; i<args->size/sizeof(WORD); i++) {
+            ctx->value.dict[i+1+is_method].name = as_label(args->value.ws[i]);
+            ctx->value.dict[i+1+is_method].value = eval(expr->value.ws[i+1+!is_method], caller_ctx);
+        }
+    }
+
+    // If our body is a block literal, that block evals to a bound lambda.
+    // Then eval'ing that lambda brings us right back here.
+    // Technically the block should eval to a bound lambda with a Sequence as its body
+    // But that detail is still TODO, so this is how we solve it for now.
+    if (as_obj(as_obj(body)->type) == core_types[CT_BLOCK]->type) return doseq(body, ctx);
+    else return eval(body, ctx);
 }
 
-void print_meth_cb(Object * ctx, WORD val) {
+// To evaluate an expression of the type `obj message arg1 arg2`,
+// we lookup the message; if type is native method, this function is called.
+WORD apply_method(WORD msg, WORD obj, Object * expr, Object * caller_ctx) {
+    return apply_native(msg, obj, expr, caller_ctx, true);
+}
+
+// To evaluate an expression of the type `lambda apply arg1 arg2`,
+// this `apply` primitive is invoked, either from native code or from
+// another primitive for something like `if`.
+// TODO technically speaking this is a `funcall`, not an `apply`.
+// Even though none of our `apply` methods cleanly combine a resolved method
+// with its arguments, but rather with the expression from which is was resolved,
+// the resulting `expr` argument layout is still different from this one.
+// We detect and make up for that difference in apply_native, but wwe may also
+// want to further acknowlege it in choice of naming.
+WORD apply_lambda_cb(WORD lambda, Object * expr, Object * caller_ctx) {
+    return apply_native(lambda, nil, expr, caller_ctx, false);
+}
+
+
+WORD print_meth_cb(WORD val, Object * expr, Object * ctx) {
     printf("method "); print_list(val, ctx);
+    return nil;
+}
+
+WORD print_lambda_cb(WORD val, Object * expr, Object * ctx) {
+    printf("lambda "); print_list(val, ctx);
+    return nil;
 }
 
 void meth_core_type(CoreType * ct, Object * ctx) {
@@ -52,5 +97,15 @@ void meth_core_type(CoreType * ct, Object * ctx) {
     set_parent(ct->type, core_types[CT_PARR]->type);
     define(ct->type, string_literal("print"), make_prim(print_meth_cb));
 
-    ct->apply = apply_method;
+//    ct->apply = apply_method;
 }
+
+void lambda_core_type(CoreType * ct, Object * ctx) {
+    define(ctx, string_literal("Lambda"), tag_obj(ct->type));
+    set_parent(ct->type, core_types[CT_PARR]->type);
+    define(ct->type, string_literal("print"), make_prim(print_lambda_cb));
+    define(ct->type, string_literal("apply"), make_prim(apply_lambda_cb));
+
+//    ct->apply = apply_method;
+}
+

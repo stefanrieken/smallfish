@@ -29,7 +29,7 @@ void gc_mark_obj_array(Object * obj_array, Object * ctx) {
     }
 }
 
-WORD mark_array_cb(Object * ctx, WORD val) {
+WORD mark_array_cb(WORD val, Object * expr, Object * ctx) {
     gc_mark_obj_array(as_obj(val), ctx);
     return nil;
 }
@@ -41,8 +41,9 @@ void print_list(WORD val, Object * ctx) {
     }
 }
 
-void print_parr_cb(Object * ctx, WORD val) {
+WORD print_parr_cb(WORD val, Object * expr, Object * ctx) {
     printf("[ "); print_list(val, ctx); printf("]");
+    return nil;
 }
 
 void parr_core_type(CoreType * ct, Object * ctx) {
