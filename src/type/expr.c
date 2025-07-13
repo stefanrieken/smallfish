@@ -21,6 +21,8 @@ WORD parse_expr(int * ch, char until) {
     int idx = 0; // have none yet
     WORD * expr = NULL; 
 
+    while (*ch == '#') { while (*ch != EOF && *ch != '\n') *ch = getchar(); *ch = getchar(); }
+
     while (*ch != EOF && *ch != until) {
         if (idx == size) expr = reallocate(expr, WORD, ++size);
         expr[idx++] = parse_object(ch);

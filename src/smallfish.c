@@ -185,12 +185,12 @@ int main (int argc, char ** argv) {
 
     PERMGEN = objects[0].value.count;
     printf("READY.\n> ");
-    int ch = read_non_whitespace_char('\n');
+    int ch = read_non_whitespace_char(EOF);
     WORD result = parse_expr(&ch, '\n');
     while(result != nil) { // TODO adjust parse_expr to return proper end value
         result = eval(result, root);
         printf("["); print_val(result, root); printf("] Ok.\n> ");
-        ch = read_non_whitespace_char('\n');
+        ch = read_non_whitespace_char(EOF);
         result = parse_expr(&ch, '\n');
     }
 

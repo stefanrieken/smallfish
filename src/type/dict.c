@@ -47,7 +47,7 @@ WORD define_cb(WORD dict, Object * expr, Object * ctx) {
         if (as_obj(body)->type == tag_obj(core_types[CT_LAMBDA]->type)) body =  as_obj(body)->value.ws[1];  // unwrap lambda
         return define1(as_obj(dict), name, make_method(args, body, ctx))->value; // TODO do eval body
     } else {
-        // Don't eval name, just demand it to be label TODO well maybe use string
+        // Don't eval name, just demand it to be label TODO well no, just eval it but demand it to be string
         return define1(as_obj(dict), name, eval(expr->value.ws[3], ctx))->value;
     }
 }
@@ -67,6 +67,14 @@ DictEntry * lookup(Object * dict, WORD name) {
     if(dict->size >0) return lookup(as_obj(dict->value.dict[0].value), name);
     return NULL;
 }
+
+WORD set_cb(WORD dict, Object * expr, Object * ctx) {
+    DictEntry * entry = lookup(as_obj(dict), as_label(eval(expr->value.ws[2], ctx)));
+    if (entry == NULL) { printf("set: var not found\n"); return nil;}
+    entry->value = eval(expr->value.ws[3], ctx);
+    return entry->value;
+}
+
 
 WORD ls(WORD val, Object * expr, Object * ctx) {
     Object * dict = as_obj(val);
@@ -113,6 +121,7 @@ void dict_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Dictionary"), tag_obj(ct->type));
     define(ct->type, string_literal("mark"), make_prim(mark_array_cb)); // comes down to the same thing
     define(ct->type, string_literal("define"), make_prim(define_cb));
+    define(ct->type, string_literal("set"), make_prim(set_cb));
     define(ct->type, string_literal("parent"), make_prim(parent_cb));
     define(ct->type, string_literal("ls"), make_prim(ls));
     define(ct->type, string_literal("bind"), make_prim(bind_cb));
