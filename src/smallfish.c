@@ -53,6 +53,7 @@ Object * add_object(ObjectTable ** table, void * value, Object * type, int size)
 WORD STR_EVAL;
 WORD STR_PRINT;
 WORD STR_MARK;
+WORD STR_ENV;
 
 // 1-arg message
 WORD message1(WORD obj, WORD name, Object * ctx) {
@@ -80,14 +81,17 @@ WORD eval(WORD val, Object * ctx) {
     // (Note: this applies to evaluating arguments only. To apply methods, different bits of
     // theory and pragmatics apply; see e.g. `message` above.)
     if (as_obj(obj->type) == core_types[CT_STRING_RO]->type) return resolve_label(val, ctx);
+    if (as_obj(obj->type) == core_types[CT_SEQ]->type) return doseq(val, ctx);
     if (as_obj(obj->type) == core_types[CT_EXPR]->type) return eval_expr(val, ctx);
+    if (as_obj(obj->type) == core_types[CT_LAMBDA]->type) return eval_lambda(val, ctx);
     if (as_obj(obj->type) == core_types[CT_BLOCK]->type) return eval_block(val, ctx);
+    if (as_obj(obj->type) == core_types[CT_PARR]->type) return eval_array(val, ctx);
     return val; // eval to self; this is also true for blocks, methods etc. (only exception MAYBE implicit binding)
 #else
     // Evaluate objects using the object's class' `eval` function.
     // As evident from the above, the vast majority of types should eval to self.
     DictEntry * entry = lookup(as_obj(obj->type), STR_EVAL); // TODO add back `eval` callbacks for label, expr
-    if (entry == NULL) return val; // If we don't suppply a default `eval` method, e.g. with Object
+    if (entry == NULL) return val; // If we don't supply a default `eval` method, e.g. with Object
     if (as_obj(entry->value)->type == tag_obj(core_types[CT_PRIM]->type)) return apply_prim(entry->value, val, NULL, ctx);
     if (as_obj(entry->value)->type == tag_obj(core_types[CT_METH]->type)) return apply_method(entry->value, val, NULL, ctx);
     return entry->value; // Umm, let's say eval func is actually int 42; return that?
@@ -121,15 +125,15 @@ int main (int argc, char ** argv) {
     CT_STRING_RO = 3;
     CT_DICT = 5;
 
-    root = add_object(&objects, make_dict(nil, 1), NULL, sizeof(DictEntry) * 1); // can't pre-allocate more because no fill size indicator!
+    root = make_dict(nil, NULL); // can't pre-allocate more because no fill size indicator!
 
-    num_core_types = 15;
+    num_core_types = 16;
     core_types = allocate(CoreType *, num_core_types);
 
     // Initialize stub core type class objects
     for (int i=0;i<num_core_types;i++) {
         core_types[i] = allocate(CoreType, 1);
-        core_types[i]->type = add_object(&objects, make_dict(nil, 1), NULL, sizeof(DictEntry) * 1);
+        core_types[i]->type = make_dict(nil, NULL);
     }
 
     STR_EVAL = tag_obj(string_literal("eval"));
@@ -156,6 +160,7 @@ int main (int argc, char ** argv) {
     CT_DICT      = idx; dict_core_type(core_types[idx++], root);
 
     CT_PARR      = idx; parr_core_type(core_types[idx++], root);
+    CT_SEQ       = idx; seq_core_type(core_types[idx++], root); // Make parsing a sequence have precedence over expr; MAYBE reduce 1-expr sequence to expr in parser
     CT_EXPR      = idx; expr_core_type(core_types[idx++], root);
     CT_METH      = idx; meth_core_type(core_types[idx++], root);
     CT_LAMBDA    = idx; lambda_core_type(core_types[idx++], root);
@@ -174,6 +179,8 @@ int main (int argc, char ** argv) {
             core_types[i]->type->type = tag_obj(core_types[CT_DICT]->type);
         }
     }
+    // Smooth over some problems by giving the target entry of 'nil' a type
+    objects[0].type=tag_obj(core_types[CT_OBJ]->type);
 
     define(root, string_literal("env"), tag_obj(root));
     define(root, string_literal("gc"), make_prim(gc_cb));
@@ -182,16 +189,16 @@ int main (int argc, char ** argv) {
     STR_EVAL = tag_obj(string_literal("eval"));
     STR_PRINT = tag_obj(string_literal("print"));
     STR_MARK = tag_obj(string_literal("mark"));
+    STR_ENV = tag_obj(string_literal("env"));
 
     PERMGEN = objects[0].value.count;
     printf("READY.\n> ");
     int ch = read_non_whitespace_char(EOF);
-    WORD result = parse_expr(&ch, '\n');
-    while(result != nil) { // TODO adjust parse_expr to return proper end value
+    WORD result;
+    while(parse_seq(&ch, &result, '\n')) { // TODO adjust parse_expr to return proper end value
         result = eval(result, root);
         printf("["); print_val(result, root); printf("] Ok.\n> ");
         ch = read_non_whitespace_char(EOF);
-        result = parse_expr(&ch, '\n');
     }
 
     printf("\n");

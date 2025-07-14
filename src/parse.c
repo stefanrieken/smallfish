@@ -27,11 +27,10 @@ int read_non_whitespace_char(char until) {
 }
 
 // Call all CoreType parsers until one succeeds
-WORD parse_object(int * ch) {
-    WORD result;
+bool parse_object(int * ch, WORD * result) {
     for(int i=0; i< num_core_types; i++) {
-        if (core_types[i]->parse != NULL && core_types[i]->parse(ch, &result)) return result;
+        if (core_types[i]->parse != NULL && core_types[i]->parse(ch, result)) return true;
     }
     printf("Parse error '%c'\n", *ch); exit(-1);
-    return nil;
+    return false;
 }

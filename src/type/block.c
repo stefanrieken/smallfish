@@ -14,21 +14,28 @@
 #include "int.h"
 
 int CT_BLOCK;
-int CT_SEQUENCE;
 
 bool parse_block(int * ch, WORD * result) {
     if (*ch != '{') return false;
     *ch = read_non_whitespace_char('}');
-    *result = parse_expr(ch, '}'); // TODO should also return on '}' or other closing chars
-    *ch = getchar();
+    bool success = parse_seq(ch, result, '}'); // TODO parse sequence; and what to do if empty?
+    *ch = getchar(); // TODO check valid
 
-    as_obj(*result)->type = tag_obj(core_types[CT_BLOCK]->type);
+    if (!success) *result = nil; // allow empty block
+    //Object * value = success ? as_obj(*result) : NULL; // allow empty block
+    // Wrap expression / sequence / value inside block; to be unwrapped on eval == bind
+    *result = tag_obj(add_object(&objects, as_obj(*result), core_types[CT_BLOCK]->type, 0));
 
     return true;
 }
 
+WORD mark_block_cb(WORD val, Object * expr, Object * ctx) {
+    gc_mark(tag_obj(as_obj(val)->value.obj), ctx);
+    return nil;
+}
+
 WORD print_block_cb(WORD val, Object * expr, Object * ctx) {
-    printf("{ "); print_list(val, ctx); printf("}");
+    printf("{ "); if (as_obj(val)->value.obj != NULL) print_list(tag_obj(as_obj(val)->value.obj), ctx); printf("}");
     return nil;
 }
 
@@ -38,15 +45,10 @@ WORD print_block_cb(WORD val, Object * expr, Object * ctx) {
 // (and in case of a method definition, undo its binding); or
 // it may be eval'ed directly in `if`s and `loop`s.
 WORD eval_block(WORD block, Object * ctx) {
-//printf("Eval'ing block\n");
-    return make_lambda(nil, block, ctx);
+    return make_lambda(nil, tag_obj(as_obj(block)->value.obj), ctx);
 }
 WORD eval_block_cb(WORD block, Object * this_expr, Object * ctx) {
     return eval_block(block, ctx);
-}
-
-WORD doseq(WORD block, Object * ctx) {
-    return eval_expr(block, ctx);
 }
 
 WORD eval_sequence_cb(WORD block, Object * this_expr, Object * ctx) {
@@ -56,7 +58,7 @@ WORD eval_sequence_cb(WORD block, Object * this_expr, Object * ctx) {
 void block_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Block"), tag_obj(ct->type));
     define(ct->type, string_literal("eval"), make_prim(eval_block_cb));
-    define(ct->type, string_literal("mark"), make_prim(mark_array_cb));
+    define(ct->type, string_literal("mark"), make_prim(mark_block_cb));
     define(ct->type, string_literal("print"), make_prim(print_block_cb));
 
     ct->parse = parse_block;

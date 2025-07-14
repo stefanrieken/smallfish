@@ -10,6 +10,10 @@
 
 int CT_OBJ;
 
+WORD eval_to_self_cb(WORD val, Object * expr, Object * ctx) {
+    return val;
+}
+
 WORD idx_cb(WORD val, Object * expr, Object * ctx) {
     return is_int(val) ? tag_int(0) : tag_int(val >> 1);
 }
@@ -49,6 +53,7 @@ void obj_core_type(CoreType * ct, Object * ctx) {
     Object * type = ct->type;
     define(ctx, string_literal("Object"), tag_obj(type));
     define(type, string_literal("mark"), make_prim(mark_none_cb));
+    define(type, string_literal("eval"), make_prim(eval_to_self_cb));
     define(type, string_literal("type"), make_prim(type_cb));
     define(type, string_literal("print"), make_prim(print_obj_cb));
     define(type, string_literal("idx"), make_prim(idx_cb));

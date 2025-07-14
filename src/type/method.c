@@ -27,7 +27,7 @@ WORD make_method(WORD args, WORD body, Object * ctx) {
 WORD make_lambda(WORD args, WORD body, Object * ctx) {
     WORD * lambda = allocate(WORD, 3);
     lambda[0] = eval(args, ctx); // If args is an array potentially containing expressions, then eval(args) is an array containing the resulting values
-    lambda[1] = body; // TODO body arg should be evaluable too. If block, (eval block) -> (bind env block) -> lambda closure?
+    lambda[1] = body; // Body is (likely) already eval'ed at this point
     lambda[2] = tag_obj(ctx);
     return tag_obj(add_object(&objects, lambda, core_types[CT_LAMBDA]->type, sizeof(WORD) * 2));
 }
@@ -37,30 +37,27 @@ WORD apply_native(WORD val, WORD obj, Object * expr, Object * caller_ctx, bool i
     Object * args = as_obj(meth->value.ws[0]); // = actually argnames
     WORD body = meth->value.ws[1];
 
-    Object * ctx = add_object(&objects, allocate(uint8_t, (args->size+sizeof(WORD))*2), core_types[CT_DICT]->type, (args->size+sizeof(WORD))*2);
-
-    ctx->value.dict[0].name = nil;
-    if (is_method) {
-        // Set obj argument as search parent, ONLY IF it is a dict (TODO change lookup so that it can be a named parent)
-        ctx->value.dict[0].value = obj == tag_obj(core_types[CT_DICT]->type) ? obj : nil;
-    } else {
-        // set bound env as search parent
-        ctx->value.dict[0].value = meth->value.ws[2];
-    }
+    Object * ctx = make_dict(is_method ? (as_obj(obj)->compound ? obj : nil) : meth->value.ws[2], core_types[CT_DICT]->type);
+    // add_object(&objects, allocate(uint8_t, (args->size+sizeof(WORD))*2), core_types[CT_DICT]->type, (args->size+sizeof(WORD))*2);
 
     if (is_method) {
         // Set obj argument
-        ctx->value.dict[1].name = as_label(args->value.ws[0]);
-        ctx->value.dict[1].value = obj;
+        define(ctx, as_obj(as_label(args->value.ws[0])), obj);
     }
 
     if (args != objects) { // = nil
         // Add rest of arguments
-        for (int i=is_method; i<args->size/sizeof(WORD); i++) {
-            ctx->value.dict[i+1+is_method].name = as_label(args->value.ws[i]);
-            ctx->value.dict[i+1+is_method].value = eval(expr->value.ws[i+1+!is_method], caller_ctx);
+        int i=is_method;
+        for (; i<args->size/sizeof(WORD) && i < expr->size/sizeof(WORD)-1-!is_method; i++) {
+            define(ctx, as_obj(as_label(args->value.ws[i])), eval(expr->value.ws[i+1+!is_method], caller_ctx));
+        }
+        // Add expected args not in expr
+        for(;i<args->size/sizeof(WORD); i++) {
+            define(ctx, as_obj(as_label(args->value.ws[i])), nil);
         }
     }
+
+    define(ctx, as_obj(STR_ENV), tag_obj(ctx));
 
     // If our body is a block literal, that block evals to a bound lambda.
     // Then eval'ing that lambda brings us right back here.
@@ -89,12 +86,20 @@ WORD apply_lambda_cb(WORD lambda, Object * expr, Object * caller_ctx) {
     return apply_native(lambda, nil, expr, caller_ctx, false);
 }
 
+WORD eval_lambda(WORD lambda, Object * caller_ctx) {
+    return apply_native(lambda, nil, NULL, caller_ctx, false);
+}
+
+WORD eval_lambda_cb(WORD lambda, Object * expr, Object * ctx) {
+    return eval_lambda(lambda, ctx);
+}
+
 WORD loop_cb(WORD lambda, Object * expr, Object * ctx) {
-//    WORD result;
-//    do {
-//       result =
-           doseq(as_obj(lambda)->value.ws[1], ctx); printf("TODO make evaluation of sequences work first!\n");
-//    } while (as_obj(as_obj(result)->type) == core_types[CT_TRUE]->type);
+    WORD result;
+    do {
+       result =
+           doseq(as_obj(lambda)->value.ws[1], ctx);
+    } while (as_obj(as_obj(result)->type) == core_types[CT_TRUE]->type);
     return nil;
 }
 
@@ -119,6 +124,7 @@ void meth_core_type(CoreType * ct, Object * ctx) {
 void lambda_core_type(CoreType * ct, Object * ctx) {
     define(ctx, string_literal("Lambda"), tag_obj(ct->type));
     set_parent(ct->type, core_types[CT_PARR]->type);
+    define(ct->type, string_literal("eval"), make_prim(eval_lambda_cb));
     define(ct->type, string_literal("print"), make_prim(print_lambda_cb));
     define(ct->type, string_literal("apply"), make_prim(apply_lambda_cb));
     define(ct->type, string_literal("loop"), make_prim(loop_cb));

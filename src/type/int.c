@@ -35,16 +35,35 @@ WORD print_int_cb(WORD obj, Object * expr, Object * ctx) {
     return nil;
 }
 
-bool parse_int1(int * ch, WORD * result) {
-    bool success = false;
-    WORD value = 0;
-    while (*ch >= '0' && *ch <= '9') {
-        success = true;
-        value = value * 10 + (*ch - '0');
+// Note: this result is NOT tagged!
+WORD parse_int_with_radix(int * ch, int radix) {
+    int result = 0;
+    // Allow letters for numbers 10 and higher, dependent on radix
+    int normalized = *ch;
+    if (*ch >= 'a' && *ch <= 'z') normalized = '0'+10+(*ch-'a');
+    else if (*ch >= 'A' && *ch <= 'Z') normalized = '0'+10+(*ch-'A');
+    while(normalized >= '0' && normalized <= '0'+radix) {
+        result = (result * radix) + (normalized-'0');
         *ch = getchar();
+        normalized = *ch;
+        if (*ch >= 'a' && *ch <= 'z') normalized = '0'+10+(*ch-'a');
+        else if (*ch >= 'A' && *ch <= 'Z') normalized = '0'+10+(*ch-'A');
+        else if (*ch < '0' || *ch > '9') break;
     }
-    *result = tag_int(value);
-    return success;
+    return result;
+}
+
+bool parse_int(int * ch, WORD * result) {
+    if (*ch < '0' || *ch > '9') return false; // not an int
+    int radix = 10;
+    if (*ch == '0') {
+        radix = 8; // Allow for octal by way of leading zero
+        *ch = getchar();
+        if (*ch == 'x') { radix=16; *ch = getchar(); }
+        if (*ch == 'b') { radix= 2; *ch = getchar(); }
+    }
+    *result = tag_int(parse_int_with_radix(ch, radix));
+    return true;
 }
 
 void int_core_type(CoreType * ct, Object * ctx) {
@@ -66,7 +85,6 @@ void int_core_type(CoreType * ct, Object * ctx) {
     define(type, string_literal(">="), make_prim( gte_cb));
     define(type, string_literal("=="), make_prim( eq_cb));
 
-//    ct->apply = apply_to_self; // for now at least; but there are interesting ways to apply ints
-    ct->parse = parse_int1;
+    ct->parse = parse_int;
 };
 

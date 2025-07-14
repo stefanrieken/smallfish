@@ -7,6 +7,7 @@
 
 #include "dict.h"
 #include "prim.h"
+#include "int.h"
 
 int CT_STRING_RO;
 int CT_STRING;
@@ -49,13 +50,14 @@ WORD print_label_cb(WORD val, Object * expr, Object * ctx) {
 }
 WORD print_string_cb(WORD val, Object * expr, Object * ctx) {
     // Find the value in the pointed-to Label
-    printf("\"%s\"", as_obj(val)->value.obj->value.str);
+//    printf("\"%s\"", as_obj(val)->value.obj->value.str);
+    printf("%s", as_obj(val)->value.obj->value.str);
     return nil;
 }
 
 WORD resolve_label(WORD val, Object * ctx) {
     DictEntry * entry = lookup(ctx, val);
-    if (entry == NULL) { printf("Unresolved variable %s\n", as_obj(val)->value.str); ls(tag_obj(ctx), NULL, ctx); return val; }
+    if (entry == NULL) { printf("Unresolved variable %s\n", as_obj(val)->value.str); /*ls(tag_obj(ctx), ctx, false);*/ return val; }
     return entry->value;
 }
 
@@ -99,6 +101,10 @@ void label_core_type(CoreType * ct, Object * ctx) {
     ct->parse = parse_label;
 };
 
+// Used for characters in strings and chars
+char * escapes = "nrtfe";
+char * ctrlchars = "\n\r\t\f\e";
+
 bool parse_string(int * ch, WORD * result) {
     // Ideally label should be considered after exhausting other things
     // For now, do some sanity checking
@@ -108,7 +114,17 @@ bool parse_string(int * ch, WORD * result) {
 
     char buffer[256]; int i=0;
     while (*ch != EOF && *ch != '\"') {
-        // TODO escape sequences
+        if (*ch == '\\') {
+            *ch = getchar();
+            if (*ch == 'x') {
+                *ch = getchar();
+                *ch = parse_int_with_radix(ch, 16);
+            } else {
+                for (int j=0; j<strlen(escapes); j++) {
+                    if (escapes[j] == *ch) { *ch = ctrlchars[j]; break; }
+                }
+            }
+        }
         buffer[i++] = *ch;
         *ch=getchar();
     }
@@ -128,7 +144,7 @@ bool parse_string(int * ch, WORD * result) {
 // So a String (for now) is an indirect pointer to a Label.
 // We don't GC labels as a rule; but if we ever change that rule,
 // we must mark them as in use.
-WORD mark_string_cb(Object * ctx, WORD val) {
+WORD mark_string_cb(WORD val, Object * expr, Object * ctx) {
     gc_mark(tag_obj(as_obj(val)->value.obj), ctx);
     return nil;
 }

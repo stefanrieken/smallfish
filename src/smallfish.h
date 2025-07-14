@@ -44,19 +44,20 @@ typedef struct ObjectTableEntry {
         char * str;
         WORD * ws; // word size (array) value
         struct ObjectTableEntry * obj;
-        DictEntry * dict;        
+        DictEntry * dict;
         int count; // only for entry #0!
     } value;
 
     // On 64-bit systems, this struct totals to 16 bytes (2 x 64 bits)
     // On 32-bit systems, this struct totals to 12 bytes (3 x 32 bits)
     uint16_t size;
-    uint16_t refcount; // Could be only 1 'gc_mark' bit; but refcount MAY get use when actively cleaning up objects like stack frames
+    uint8_t refcount; // Could be only 1 'gc_mark' bit; but refcount MAY get use when actively cleaning up objects like stack frames
+    bool compound; // Whether or not the object is a compound type (i.e., a Dictionary) independent of class
     uint32_t type; // object class; NOTE this assumes WORD <= 32 bits
 
 } ObjectTable, Object;
 
-#define GC_FREE UINT16_MAX
+#define GC_FREE UINT8_MAX
 
 //
 // Core type support
@@ -78,6 +79,7 @@ extern CoreType ** core_types;
 extern WORD STR_EVAL;
 extern WORD STR_PRINT;
 extern WORD STR_MARK;
+extern WORD STR_ENV;
 
 // 1-arg message (= 1-arg apply)
 WORD message1(WORD obj, WORD name, Object * ctx);

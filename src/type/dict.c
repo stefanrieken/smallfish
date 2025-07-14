@@ -11,11 +11,15 @@
 
 int CT_DICT;
 
-Dictionary * make_dict(WORD parent, int num_entries) {
-    DictEntry * dict = allocate(DictEntry, num_entries); // including parent
+Object * make_dict(WORD parent, Object * type) {
+    DictEntry * dict = allocate(DictEntry, 1); // can't pre-allocate more because size == fill size
     dict->name = nil; // or "(parent)"
     dict->value = parent;
-    return dict;
+
+    Object * result = add_object(&objects, dict, type, sizeof(DictEntry) * 1);
+    result->compound = true;
+
+    return result;
 }
 
 DictEntry * define1(Object * dict, WORD name, WORD value) {
@@ -43,7 +47,6 @@ WORD define_cb(WORD dict, Object * expr, Object * ctx) {
     if (expr->size / sizeof(WORD) > 4) {
         WORD args = expr->value.ws[3]; // TODO we can afford to eval this now
         WORD body = eval(expr->value.ws[4], ctx);
-        printf("Body is %p\n", as_obj(as_obj(body)->type));
         if (as_obj(body)->type == tag_obj(core_types[CT_LAMBDA]->type)) body =  as_obj(body)->value.ws[1];  // unwrap lambda
         return define1(as_obj(dict), name, make_method(args, body, ctx))->value; // TODO do eval body
     } else {
@@ -75,14 +78,14 @@ WORD set_cb(WORD dict, Object * expr, Object * ctx) {
     return entry->value;
 }
 
-
-WORD ls(WORD val, Object * expr, Object * ctx) {
+void ls(WORD val, Object * ctx, bool as_parent) {
     Object * dict = as_obj(val);
     if (dict->value.dict[0].value != nil) {
-        printf("parent: "); print_val(dict->value.dict[0].value, ctx); printf("\n");
-        ls(dict->value.dict[0].value, expr, ctx);
-        printf("self:\n");
+        ls(dict->value.dict[0].value, ctx, true);
+        if (!as_parent) printf("self:\n");
     }
+
+    if (as_parent) { printf("parent: "); print_val(val, ctx); printf("\n"); }
 
     for (int i=1; i<(dict->size/sizeof(DictEntry)); i++) {
         DictEntry * entry = &(dict->value.dict[i]);
@@ -90,7 +93,11 @@ WORD ls(WORD val, Object * expr, Object * ctx) {
         print_val(entry->value, ctx);
         printf("\n");
     }
-    return nil;
+}
+
+WORD ls_cb(WORD val, Object * expr, Object * ctx) {
+   ls(val, ctx, false);
+   return nil;
 }
 
 WORD parent_cb(WORD val, Object * expr, Object * ctx) {
@@ -108,7 +115,7 @@ WORD bind_cb(WORD val, Object * expr, Object * ctx) {
     WORD args = eval(expr->value.ws[2], ctx);
     WORD lambda = eval(expr->value.ws[3], ctx); // <-- block self-evals to lambda here
     as_obj(lambda)->value.ws[0] = args;
-    as_obj(lambda)->value.ws[3] = tag_obj(env);
+    as_obj(lambda)->value.ws[2] = tag_obj(env);
 
     return lambda;
 }
@@ -123,7 +130,7 @@ void dict_core_type(CoreType * ct, Object * ctx) {
     define(ct->type, string_literal("define"), make_prim(define_cb));
     define(ct->type, string_literal("set"), make_prim(set_cb));
     define(ct->type, string_literal("parent"), make_prim(parent_cb));
-    define(ct->type, string_literal("ls"), make_prim(ls));
+    define(ct->type, string_literal("ls"), make_prim(ls_cb));
     define(ct->type, string_literal("bind"), make_prim(bind_cb));
 };
 
