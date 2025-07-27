@@ -54,6 +54,7 @@ WORD STR_EVAL;
 WORD STR_PRINT;
 WORD STR_MARK;
 WORD STR_ENV;
+WORD STR_APPLY;
 
 // 1-arg message
 WORD message1(WORD obj, WORD name, Object * ctx) {
@@ -184,12 +185,13 @@ int main (int argc, char ** argv) {
 
     define(root, string_literal("env"), tag_obj(root));
     define(root, string_literal("gc"), make_prim(gc_cb));
-    define(root, string_literal("help"), tag_obj(string_literal("Type 'env ls' to list global defintions. Type e.g. 'Int ls' to find integer methods.")));
+    define(root, string_literal("help"), tag_obj(string_literal("Type 'ls' to list global defintions. Type e.g. 'Int.ls' to find integer methods.")));
 
     STR_EVAL = tag_obj(string_literal("eval"));
     STR_PRINT = tag_obj(string_literal("print"));
     STR_MARK = tag_obj(string_literal("mark"));
     STR_ENV = tag_obj(string_literal("env"));
+    STR_APPLY = tag_obj(string_literal("apply"));
 
     PERMGEN = objects[0].value.count;
     printf("READY.\n> ");

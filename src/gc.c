@@ -7,6 +7,7 @@
 #include "type/string.h"
 #include "type/expr.h"
 #include "type/dict.h"
+#include "type/block.h"
 
 int PERMGEN;
 
@@ -33,7 +34,11 @@ void gc_mark(WORD val, Object * ctx) {
 int gc_sweep() {
     int freed = 0;
     for (int i=PERMGEN; i<objects->value.count;i++) {
-        if (objects[i].refcount == 0 && objects[i].type != tag_obj(core_types[CT_PRIM]->type) && objects[i].type != tag_obj(core_types[CT_STRING_RO]->type)) { // Values below this are not deallocatable
+        if (
+            // TODO reorder core types so that all types below a certain value are not deallocatable
+            objects[i].refcount == 0 && objects[i].type != tag_obj(core_types[CT_PRIM]->type) && objects[i].type != tag_obj(core_types[CT_STRING_RO]->type) // These are not deallocatable
+            && objects[i].type != tag_obj(core_types[CT_STRING]->type) && objects[i].type != tag_obj(core_types[CT_BLOCK]->type) // These point to other objects
+        ) {
             // printf("freeing %d\n", objects[i].type);
             free(objects[i].value.ptr);
             objects[i].refcount = GC_FREE;

@@ -14,11 +14,37 @@
 
 int CT_PARR;
 
+// Was adapted from parse_expr
+bool parse_arr1(int * ch, WORD * result, char until) {
+    int size = 0; // Not presently feasible to pre-alloc larger than used
+    int idx = 0; // have none yet
+
+    WORD * expr = NULL; 
+
+    while (*ch == '#') { while (*ch != EOF && *ch != '\n') *ch = getchar(); *ch = getchar(); }
+
+    // Note: 'until' is essentially just '\n' for REPL, or non-applicable otherwise
+    // We should simply always recognize all common expression-delimiting characters (brackets, ';', commas)
+    WORD o;
+    while (*ch != EOF && *ch != ';' && *ch != until && parse_object(ch, &o)) {
+        if (idx == size) expr = reallocate(expr, WORD, ++size);
+        expr[idx++] = o;
+        if (*ch != EOF && *ch != until && is_whitespace_char(*ch)) *ch = read_non_whitespace_char(until);
+    }
+
+    if (idx == 0) { *result = nil; return false; } // no result
+    // allow single-value (sub)expression to be just the value
+//    if (idx == 1 /*&& until == ')'*/) { *result = expr[0]; free(expr); return true; }
+
+    *result = tag_obj(add_object(&objects, expr, core_types[CT_EXPR]->type, sizeof(WORD) * size));
+    return true;
+}
+
 bool parse_array(int * ch, WORD * result) {
     if (*ch != '[') return false;
     *ch = read_non_whitespace_char(']');
     bool success =
-    parse_expr(ch, result, ']'); // This just happens to work. Of course, contents of array !+ objects in expression
+    parse_arr1(ch, result, ']');
     *ch = getchar();
 
     

@@ -65,6 +65,8 @@ WORD resolve_label_cb(WORD val, Object * expr, Object * ctx) {
     return resolve_label(val, ctx);
 }
 
+bool parsed_operator;
+
 bool parse_label(int * ch, WORD * result) {
     // Ideally label should be considered after exhausting other things
     // For now, do some sanity checking
@@ -73,13 +75,15 @@ bool parse_label(int * ch, WORD * result) {
 
     char buffer[256]; int i=0;
     if (is_binary_expr(*ch)) {
+        parsed_operator = true;
         // binary expression. TODO merge with label below, only continuation criteria differ
         while (is_binary_expr(*ch)) {
             buffer[i++] = *ch;
             *ch=getchar();
         }
     } else {
-        while (*ch != EOF && *ch != ';' && !is_whitespace_char(*ch) && !is_bracket(*ch) && !is_binary_expr(*ch)) {
+        parsed_operator = false;
+        while (*ch != EOF && *ch != ';' && !is_whitespace_char(*ch) && !is_bracket(*ch) && !is_binary_expr(*ch) && *ch != '.') {
             buffer[i++] = *ch;
             *ch=getchar();
         }

@@ -16,7 +16,7 @@ bool is_bracket(int ch) {
 bool is_binary_expr(int ch) {
     return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%'
         || ch == '<' || ch == '>' || ch == '&' || ch == '|' || ch == '^'
-        || ch == '!' || ch == '~';
+        || ch == '!' || ch == '~' || ch == '=' || ch == '?';
 }
 
 int read_non_whitespace_char(char until) {
@@ -28,6 +28,7 @@ int read_non_whitespace_char(char until) {
 
 // Call all CoreType parsers until one succeeds
 bool parse_object(int * ch, WORD * result) {
+    while (*ch == '#') { while (*ch != EOF && *ch != '\n') *ch = getchar(); *ch = getchar(); }
     for(int i=0; i< num_core_types; i++) {
         if (core_types[i]->parse != NULL && core_types[i]->parse(ch, result)) return true;
     }

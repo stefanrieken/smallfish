@@ -7,6 +7,7 @@
 #include "dict.h"
 #include "prim.h"
 #include "string.h"
+#include "bool.h"
 
 int CT_OBJ;
 
@@ -19,7 +20,7 @@ WORD idx_cb(WORD val, Object * expr, Object * ctx) {
 }
 
 WORD obj_eq_cb(WORD val, Object * expr, Object * ctx) {
-    return (val == eval(expr->value.ws[2], ctx)) ? tag_int(1) : nil; // TODO True / False
+    return (val == eval(expr->value.ws[2], ctx)) ? tag_obj(core_types[CT_TRUE]->type) : tag_obj(core_types[CT_FALSE]->type);
 }
 
 WORD type_cb(WORD val, Object * expr, Object * ctx) {

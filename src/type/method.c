@@ -47,7 +47,7 @@ WORD apply_native(WORD val, WORD obj, Object * expr, Object * caller_ctx, bool i
 
     if (args != objects) { // = nil
         // Add rest of arguments
-        int i=is_method;
+        int i=is_method; // TODO ONLY when calling via .apply
         for (; i<args->size/sizeof(WORD) && i < expr->size/sizeof(WORD)-1-!is_method; i++) {
             define(ctx, as_obj(as_label(args->value.ws[i])), eval(expr->value.ws[i+1+!is_method], caller_ctx));
         }
@@ -71,6 +71,11 @@ WORD apply_native(WORD val, WORD obj, Object * expr, Object * caller_ctx, bool i
 // we lookup the message; if type is native method, this function is called.
 WORD apply_method(WORD msg, WORD obj, Object * expr, Object * caller_ctx) {
     return apply_native(msg, obj, expr, caller_ctx, true);
+}
+
+// To call a lambda as if it were a method
+WORD apply_lambda(WORD msg, WORD obj, Object * expr, Object * caller_ctx) {
+    return apply_native(msg, obj, expr, caller_ctx, false);
 }
 
 // To evaluate an expression of the type `lambda apply arg1 arg2`,

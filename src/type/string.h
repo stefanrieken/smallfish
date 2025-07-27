@@ -1,6 +1,9 @@
 extern int CT_STRING_RO;
 extern int CT_STRING;
 
+// Really cheesy but effective way to communicate last label parsed was an operator
+extern bool parsed_operator;
+
 Object * make_string(char * value);
 Object * string_literal(char * value);
 

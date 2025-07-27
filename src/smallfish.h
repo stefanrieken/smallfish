@@ -80,6 +80,7 @@ extern WORD STR_EVAL;
 extern WORD STR_PRINT;
 extern WORD STR_MARK;
 extern WORD STR_ENV;
+extern WORD STR_APPLY;
 
 // 1-arg message (= 1-arg apply)
 WORD message1(WORD obj, WORD name, Object * ctx);
