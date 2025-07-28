@@ -90,6 +90,11 @@ WORD print_parr_cb(WORD val, Object * expr, Object * ctx) {
     return nil;
 }
 
+WORD parr_get_cb(WORD val, Object * expr, Object * ctx) {
+    WORD idx = eval(expr->value.ws[2], ctx);
+    return as_obj(val)->value.ws[as_int(idx)];
+}
+
 WORD foreach_parr_cb(WORD val, Object * expr, Object * ctx) {
     Object * lambda = as_obj(eval(expr->value.ws[2], ctx));
     if (as_obj(lambda->type) != core_types[CT_LAMBDA]->type) { printf("Error: expected a callback\n"); return nil; }
@@ -111,6 +116,7 @@ void parr_core_type(CoreType * ct, Object * ctx) {
     define(ct->type, string_literal("mark"), make_prim(mark_array_cb));
     define(ct->type, string_literal("eval"), make_prim(eval_array_cb));
     define(ct->type, string_literal("print"), make_prim(print_parr_cb));
+    define(ct->type, string_literal("get"), make_prim(parr_get_cb));
     define(ct->type, string_literal("foreach"), make_prim(foreach_parr_cb));
 
     ct->parse = parse_array;
